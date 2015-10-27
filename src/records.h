@@ -9,11 +9,13 @@
 namespace oa {
 struct Placement
 {
-    quint32 m_referenceNumber;
-    QString m_cellnameString;
+    //     quint32 m_referenceNumber;
+    //     QString m_cellnameString;
+    qint64 m_index;
     qreal m_manification;
     qreal m_angle;
     qint64 m_x, m_y;
+    bool m_flip;
     QSharedPointer<Repetition> m_repetition;
 };
 
@@ -21,7 +23,8 @@ struct Text {
     qint64 m_x, m_y;
     quint32 m_layer;
     quint32 m_datatype;
-    QString m_string; // TODO if string to refer is not read yet
+//     QString m_string; // TODO if string to refer is not read yet
+    qint64 m_index;
     QSharedPointer<Repetition> m_repetition;
     QVector<QPair<qint64, qint64>> value();
 };

@@ -35,12 +35,18 @@ public:
     qreal m_unit;
     quint8 m_offsetFlag;
     QVector<quint32> m_tableOffsets;
+    QVector<QString> m_localCellNames;
     QMap<quint32, QString> m_cellNames;
+    QVector<QString> m_localTextStrings;
     QMap<quint32, QString> m_textStrings;
+    QVector<QString> m_localLayerNames;
     QMap<quint32, QString> m_layerNames;
-    QMap<quint32, QString> m_PropNames;
-    QMap<quint32, QString> m_PropStrings;
-    QMap<quint32, QString> m_XNames;
+    QVector<QString> m_localPropNames;
+    QMap<quint32, QString> m_propNames;
+    QVector<QString> m_localPropStrings;
+    QMap<quint32, QString> m_propStrings;
+    QVector<QString> m_localXNames;
+    QMap<quint32, QString> m_xNames;
     QVector<QSharedPointer<Cell>> m_cells;
 
 };

@@ -240,7 +240,7 @@ bool oa::Parser::onPropName(int type)
         reference = m_propNameReference ++;
     }
     // TODO check for reference and name
-    m_layout -> m_PropNames.insert(reference, name);
+    m_layout -> m_propNames.insert(reference, name);
     return true;
 }
 
@@ -266,12 +266,13 @@ bool oa::Parser::onPropString(int type)
         reference = m_propStringReference ++;
     }
     // TODO check for reference and name
-    m_layout->m_PropStrings.insert(reference, name);
+    m_layout->m_propStrings.insert(reference, name);
     return true;
 }
 
 bool oa::Parser::onLayerName(int type)
 {
+    Q_UNUSED(type);
     QString name = onString(N);
     IntervalType boundA, boundB;
     boundA = onInterval();
@@ -279,19 +280,18 @@ bool oa::Parser::onLayerName(int type)
     // TODO How to store?
     return true;
 }
-//TODO 
+
 bool oa::Parser::onCell(int type)
 {
     QSharedPointer<Cell> cell(new Cell);
     m_layout->m_cells.push_back(cell);
-    if (type == 13) {
-        quint32 reference = onUnsigned();
-        // FIXME if cellname for reference is absent
-        cell->m_name = m_layout->m_cellNames[reference];
-    } else {
-        cell->m_name = onString(N);
-    }
     m_currentCell = cell;
+    if (type == 13) {
+        cell->m_index = onUnsigned();
+    } else {
+        cell->m_index = - m_layout->m_localCellNames.count();
+        m_layout->m_localCellNames.append(onString(N));
+    }
     return true;
 }
 
@@ -313,56 +313,244 @@ bool oa::Parser::onPlacement(int type)
     // TODO Wrap these two lines
     quint8 info = 0;
     m_dataStream >> info;
-    if (info >> 8) { // C
-        if (info & 0b01000000) { // N
-            placement.m_referenceNumber = onUnsigned();
+    // CNXYRAAF or CNXYRMAF
+    if (info >> 7) { // C
+        if ((info >> 6) & 1) { // N
+            m_placement.m_index = onUnsigned();
         } else {
-            placement.m_cellnameString = onString(N);
+            m_placement.m_index = - m_layout->m_localCellNames.count();
+            m_layout->m_localCellNames.append(onString(N));
         }
-    } else {
-        // use modal placement cell
-        placement.m_cellnameString = m_placement.m_cellnameString;
     }
+    placement.m_index = m_placement.m_index;
     if (type == 18) {
-        if (info & 0b100) { // M
+        if ((info >> 2) & 1) { // M
             placement.m_manification = onReal();
         } else {
             placement.m_manification = 1.0;
         }
-        if (info & 0b10) { // !
+        if ((info >> 1) & 1) { // A
             placement.m_angle = onReal();
         } else {
             placement.m_angle = 0.0;
         }
     }
-    if (info & 0b00100000) { // X
+    if ((info >> 5) & 1) { // X
         placement.m_x = onSigned();
         if (m_isXYRelative) {
             placement.m_x += m_placement.m_x;
         }
+        m_placement.m_x = placement.m_x;
     } else {
         placement.m_x = m_placement.m_x;
     }
-    if (info & 0b00010000) { // Y
+    if ((info >> 4) & 1) { // Y
         placement.m_y = onSigned();
         if (m_isXYRelative) {
-            placement.m_x += m_placement.m_y;
+            placement.m_y += m_placement.m_y;
         }
+        m_placement.m_y = placement.m_y;
     } else {
         placement.m_y = m_placement.m_y;
     }
-    if (info & 0b1000) { // R
-        placement.m_repetition = onRepetition();
+    if ((info >> 3) & 1) { // R
+        m_repetition = onRepetition();
+        placement.m_repetition = m_repetition;
     }
-    if (info & 0b1) { // F
-        placement.m_y = -placement.m_y; // ??
-    }
-    m_placement = placement;
+    placement.m_flip = (info & 0b1); // F
+    m_currentCell->m_placements.append(placement);
     return true;
 }
 
 bool oa::Parser::onText()
 {
+    Text text;
+    quint8 info = 0;
+    m_dataStream >> info;
+    // 0CNXYRTL
+    if (info >> 6) { // C
+        if ((info >> 5) & 1) { // N
+            text.m_index = onUnsigned();
+        } else {
+            text.m_index = m_layout->m_localTextStrings.count();
+            m_layout->m_localTextStrings.append(onString(N));
+        }
+    } else {
+        // use modal TEXTSTRING
+        text.m_index = m_text.m_index;
+    }
+    if (info & 1) { //L
+        text.m_layer = onUnsigned();
+    } else {
+        text.m_layer = m_layer;
+    }
+    if ((info >> 1) & 1) { // T
+        text.m_datatype = onUnsigned();
+    } else {
+        text.m_datatype = m_datatype;
+    }
+    if ((info >> 4) & 1) { // X
+        text.m_x = onSigned();
+        if (m_isXYRelative) {
+            text.m_x += m_text.m_x;
+        }
+    } else {
+        text.m_x = m_text.m_x;
+    }
+    if ((info >> 3) & 1) { // Y
+        text.m_y = onSigned();
+        if (m_isXYRelative) {
+            text.m_y += m_text.m_y;
+        }
+    } else {
+        text.m_y = m_text.m_y;
+    }
+    if ((info >> 2) & 1) { // R
+        text.m_repetition = onRepetition();
+    }
+    m_currentCell->m_texts.append(text);
     return true;
 }
 
+bool oa::Parser::onRectangle()
+{
+    Rectangle rectangle;
+    quint8 info = 0;
+    m_dataStream >> info;
+    // SWHXTRDL
+    if (info & 1) { // L
+        m_layer = onUnsigned();
+    }
+    rectangle.m_layer = m_layer;
+
+    if ((info >> 1) & 1) { // D
+        m_datatype = onUnsigned();
+    }
+    rectangle.m_datatype = m_datatype;
+
+    if ((info >> 6) & 1) { // W
+        m_geometryW = onUnsigned();
+    }
+    rectangle.m_width = m_geometryW;
+
+    if ((info >> 5) & 1) { // H
+        m_geometryH = onUnsigned();
+    }
+    rectangle.m_height = m_geometryH;
+
+    if ((info >> 4) & 1) { // X
+        rectangle.m_x = onUnsigned();
+        if (m_isXYRelative) {
+            rectangle.m_x += m_geometryX;
+        }
+    } else {
+        rectangle.m_x = m_geometryX;
+    }
+    if ((info >> 3) & 1) { // Y
+        rectangle.m_y = onUnsigned();
+        if (m_isXYRelative) {
+            rectangle.m_y += m_geometryY;
+        }
+    } else {
+        rectangle.m_y = m_geometryY;
+    }
+    if ((info >> 2) & 1) { // R
+        m_repetition = onRepetition();
+        rectangle.m_repetition = m_repetition;
+    }
+    m_currentCell->m_rectangles.append(rectangle);
+    return true;
+}
+
+bool oa::Parser::onPolygon()
+{
+    Polygon polygon;
+    quint8 info = 0;
+    m_dataStream >> info;
+    // 00PXYRDL
+    if (info & 1) { // L
+        m_layer = onUnsigned();
+    }
+    polygon.m_layer = m_layer;
+
+    if ((info >> 1) & 1) { // D
+        m_datatype = onUnsigned();
+    }
+    polygon.m_datatype = m_datatype;
+
+    if ((info >> 5) & 1) { // P
+         m_polygonPointList = onPointList();
+    }
+    polygon.m_pointList = m_polygonPointList;
+
+    if ((info >> 4) & 1) { // X
+        polygon.m_x = onUnsigned();
+        if (m_isXYRelative) {
+            polygon.m_x += m_geometryX;
+        }
+    } else {
+        polygon.m_x = m_geometryX;
+    }
+    if ((info >> 3) & 1) { // Y
+        polygon.m_y = onUnsigned();
+        if (m_isXYRelative) {
+            polygon.m_y += m_geometryY;
+        }
+    } else {
+        polygon.m_y = m_geometryY;
+    }
+    if ((info >> 2) & 1) { // R
+        m_repetition = onRepetition();
+        polygon.m_repetition = m_repetition;
+    }
+    m_currentCell->m_polygons.append(polygon);
+    return true;
+}
+
+bool oa::Parser::onPath()
+{
+    Path path;
+    quint8 info = 0;
+    m_dataStream >> info;
+    // EWPXYRDL
+    if (info & 1) { // L
+        m_layer = onUnsigned();
+    }
+    path.m_layer = m_layer;
+
+    if ((info >> 1) & 1) { // D
+        m_datatype = onUnsigned();
+    }
+    path.m_datatype = m_datatype;
+
+    if ((info >> 5) & 1) { // P
+         m_pointList = onPointList();
+    }
+    path.m_pointList = m_pointList;
+    if ((info >> 6) & 1) { // W
+        m_path.m_halfWidth = onUnsigned();
+    }
+    path.m_halfWidth = m_path.m_halfWidth;
+    if ((info >> 4) & 1) { // X
+        path.m_x = onUnsigned();
+        if (m_isXYRelative) {
+            path.m_x += m_geometryX;
+        }
+    } else {
+        path.m_x = m_geometryX;
+    }
+    if ((info >> 3) & 1) { // Y
+        path.m_y = onUnsigned();
+        if (m_isXYRelative) {
+            path.m_y += m_geometryY;
+        }
+    } else {
+        path.m_y = m_geometryY;
+    }
+    if ((info >> 2) & 1) { // R
+        m_repetition = onRepetition();
+        path.m_repetition = m_repetition;
+    }
+    m_currentCell->m_paths.append(path);
+    return true;
+}

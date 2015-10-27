@@ -85,16 +85,19 @@ private:
 private:
     QDataStream m_dataStream;
     Layout* m_layout;
-
+    //     QVector<QSharedPointer<Repetition>> m_repetitions;
+    //     QVector<QSharedPointer<PointList>> m_polygonPointlists;
     // Modal variables
     quint32 m_layer, m_datatype;
-    QVector<QSharedPointer<Repetition>> m_repetions;
+    QSharedPointer<Repetition> m_repetition;
+    QSharedPointer<PointList> m_polygonPointList;
+    QSharedPointer<PointList> m_pointList;
     Placement m_placement;
-    Text m_text; // textlayer, texttype, text-x, text-y, text-onPropString
+    Text m_text; // textlayer, texttype, text-x, text-y, text-propstring
     qint64 m_geometryX, m_geometryY;
     quint32 m_geometryW, m_geometryH;
     bool m_isXYRelative; // xy-mode
-    QVector<QSharedPointer<PointList>> m_polygonPointlists;
+
     Path m_path; // halfwidth, point-list, start-extension, end-extension
     quint8 m_ctrapezoidType;
     quint32 m_circleRadius;
