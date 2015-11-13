@@ -40,7 +40,7 @@ struct Cell
     QVector<Polygon> m_polygons;
     QVector<Path> m_paths;
     QVector<Trapezoid> m_trapezoids;
-    QVector<CTrapezoid> jm_ctrapezoids;
+    QVector<CTrapezoid> m_ctrapezoids;
     QVector<Circle> m_circles;
     QVector<XGeometry> m_xgeometries;
     QVector<Placement> m_placements;

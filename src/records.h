@@ -83,6 +83,7 @@ struct CTrapezoid {
     quint32 m_height, m_width;
     quint32 m_layer;
     quint32 m_datatype;
+    quint32 m_type;
     QSharedPointer<Repetition> m_repetition;
     QVector<QPair<qint64, qint64>> value();
 };
@@ -96,15 +97,14 @@ struct Circle {
     QVector<QPair<qint64, qint64>> value();
 };
 
-
-struct XELement {
-    qint64 m_x, m_y;
-    quint32 m_layer;
-    quint32 m_datatype;
+struct XName {
     quint32 m_attribute;
     QString m_string;
-    QSharedPointer<Repetition> m_repetition;
-    QVector<QPair<qint64, qint64>> value();
+};
+
+struct XELement {
+    quint32 m_attribute;
+    QString m_string;
 };
 
 struct XGeometry {

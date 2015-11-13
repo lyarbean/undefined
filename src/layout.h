@@ -45,8 +45,8 @@ public:
     QMap<quint32, QString> m_propNames;
     QVector<QString> m_localPropStrings;
     QMap<quint32, QString> m_propStrings;
-    QVector<QString> m_localXNames;
-    QMap<quint32, QString> m_xNames;
+    QVector<XName> m_localXNames;
+    QMap<quint32, XName> m_xNames;
     QVector<QSharedPointer<Cell>> m_cells;
 
 };

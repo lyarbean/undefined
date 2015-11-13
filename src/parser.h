@@ -64,7 +64,7 @@ private:
     // Data
     quint32 onUnsigned();
     qint64 onSigned();
-    qreal onReal();
+    qreal onReal(int kind = -1);
     Delta1 onDelta1();
     Delta23 onDelta2();
     Delta23 onDelta3();
