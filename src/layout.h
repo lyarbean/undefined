@@ -25,15 +25,16 @@
 #include <QVector>
 #include <QMap>
 #include "cell.h"
+
 namespace oa {
 
 class Layout
 {
 public:
     Layout();
+    
 /*private:*/
     qreal m_unit;
-    quint8 m_offsetFlag;
     QVector<quint32> m_tableOffsets;
     QVector<QString> m_localCellNames;
     QMap<quint32, QString> m_cellNames;
@@ -48,6 +49,7 @@ public:
     QVector<XName> m_localXNames;
     QMap<quint32, XName> m_xNames;
     QVector<QSharedPointer<Cell>> m_cells;
+    QMap<QString, QVector<QPair<quint32, quint32>>> m_layerMap; // cellname to data-layer
 
 };
 }

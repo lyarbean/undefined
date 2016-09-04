@@ -28,8 +28,19 @@ namespace oa {
 
 // FIXME Check if 32 bit is enough in practice
 
-using DeltaValue = QPair<qint64, qint64>;
+class DeltaValue {
+public:
+    DeltaValue(qint64 x = 0, qint64 y = 0) : m_x(x), m_y(y) {}
+    DeltaValue& operator+=(const DeltaValue &that) {
+        this->m_x += that.m_x;
+        this->m_y += that.m_y;
+        return *this;
+    }
+    qint64 m_x;
+    qint64 m_y;
+};
 
+// FIXME
 enum DeltaDirection {
     East = 1,
     North = 2,
@@ -45,31 +56,27 @@ enum DeltaDirection {
 };
 
 
+// TODO remove me
 struct Delta1 {
-    // Direction is either east/north or west/south, i.e., positive or negative, with value , 1, 2, 4, 8 exclusively;
-    Delta1(quint32 magnitude = 0);
+    Delta1(qint64 magnitude = 0);
     DeltaValue value(int direction) const;
-    quint32 m_magnitude;
+    qint64 m_magnitude;
 };
 
 struct Delta23 {
-    // For delta 2, direction is one of east, north, west and south.
-    // For delta 3, direction is one of east, north, west, south, northeast, northwest, southwest, and southeast.
-    Delta23(quint32 magnitude = 0);
-    DeltaValue value(int direction) const;
-    quint32 m_magnitude;
+    Delta23(quint64 magnitude = 0, bool isTwo = true);
+    DeltaValue value;
 };
+
 
 
 struct DeltaG {
     // For delta g1, direction is one of east, north, west, south, northeast, northwest, southwest, and southeast.
     // and m_y is 2^64 - 1, m_x is the magnitude.
     // For delta g2, direction is one of northeast, northwest, southwest, and southeast.
-    DeltaG(quint32 xMagnitude = 0, quint32 yMagnitude = -1);
-    DeltaValue value(int direction) const;
-    DeltaG& operator +=(const DeltaG that);
-    quint32 m_x;
-    quint32 m_y;
+    DeltaG(quint64 magnitude = 0);
+    DeltaG(qint64 x = 0, qint64 y = 0);
+    DeltaValue value;
 };
 
 }

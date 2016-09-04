@@ -26,81 +26,81 @@
 
 namespace oa {
 // TODO [Optimization] The direction for each delta is range of 1 to 12, so 4 bits is enough.
-
-struct PointList {
-    enum {
-        Type = -1
-    };
-    virtual int type() const {
-        return Type;
-    }
-};
-
-struct PointList0 : public PointList {
-    enum {
-        Type = 0
-    };
-    virtual int type() const {
-        return Type;
-    }
-    // 0 Horizontal first
-    // 1 Vertical first
-    virtual QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
-    QVector<quint8> m_flags; // flags must be NorthEast or SouthWest
-    QVector<Delta1> m_points;
-};
-
-struct PointList1 : public PointList0 {
-    enum {
-        Type = 1
-    };
-    virtual int type() const {
-        return Type;
-    }
-};
-
-
-struct PointList23 : public PointList {
-    enum {
-        Type = 2
-    };
-    virtual int type() const {
-        return Type;
-    }
-    // 2 manhattan
-    // 3 octangular
-    QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
-    QVector<quint8> m_flags;
-    QVector<Delta23> m_points;
-};
-
-struct PointList4 : public PointList {
-    enum {
-        Type = 4
-    };
-    virtual int type() const {
-        return Type;
-    }
-    // 4 all angle delta
-    // 5 all angle double
-    QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
-    QVector<quint8> m_flags;
-    QVector<DeltaG> m_points;
-};
-
-struct PointList5 : public PointList {
-    enum {
-        Type = 8
-    };
-    virtual int type() const {
-        return Type;
-    }
-    // 4 all angle delta
-    // 5 all angle double
-    QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
-    QVector<quint8> m_flags;
-    QVector<DeltaG> m_points;
-};
+using PointList = QVector<DeltaValue>;
+// struct PointList {
+//     enum {
+//         Type = -1
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+// };
+// 
+// struct PointList0 : public PointList {
+//     enum {
+//         Type = 0
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+//     // 0 Horizontal first
+//     // 1 Vertical first
+//     virtual QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
+//     QVector<quint8> m_flags; // flags must be NorthEast or SouthWest
+//     QVector<Delta1> m_points;
+// };
+// 
+// struct PointList1 : public PointList0 {
+//     enum {
+//         Type = 1
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+// };
+// 
+// 
+// struct PointList23 : public PointList {
+//     enum {
+//         Type = 2
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+//     // 2 manhattan
+//     // 3 octangular
+//     QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
+//     QVector<quint8> m_flags;
+//     QVector<Delta23> m_points;
+// };
+// 
+// struct PointList4 : public PointList {
+//     enum {
+//         Type = 4
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+//     // 4 all angle delta
+//     // 5 all angle double
+//     QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
+//     QVector<quint8> m_flags;
+//     QVector<DeltaG> m_points;
+// };
+// 
+// struct PointList5 : public PointList {
+//     enum {
+//         Type = 8
+//     };
+//     virtual int type() const {
+//         return Type;
+//     }
+//     // 4 all angle delta
+//     // 5 all angle double
+//     QVector<QPair<qint64, qint64>> value(qint64 x, qint64 y, bool isPolygon = true) const;
+//     QVector<quint8> m_flags;
+//     QVector<DeltaG> m_points;
+// };
 
 }
 

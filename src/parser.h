@@ -37,7 +37,7 @@ class Parser
 private:
     bool nextRecord();
     // Records
-    inline bool onPad();
+    bool onPad();
     bool onStart();
     bool onEnd();
     bool onCellName(int type); // 3 or 4
@@ -62,38 +62,45 @@ private:
     bool onXGeometry();
     bool onCBlock();
     // Data
-    quint32 onUnsigned();
+    quint64 onUnsigned();
     qint64 onSigned();
-    qreal onReal(int kind = -1);
+    double onReal();
     Delta1 onDelta1();
     Delta23 onDelta2();
     Delta23 onDelta3();
     DeltaG onDeltaG();
-    enum {
+    enum StringType {
         A,
         B,
         N
     };
-    QString onString(int type = A); // TODO Validation
+    QString onString(StringType type = A); // TODO Validation
 
     // Composite
     QSharedPointer<Repetition> onRepetition();
-    QSharedPointer<PointList> onPointList();
+    QSharedPointer<PointList> onPointList(bool isPolygon);
     bool onTableOffset();
     using IntervalType = QPair<quint32, quint32>;
     IntervalType onInterval();
+    void undefineModalVariables();
 private:
     QDataStream m_dataStream;
     Layout* m_layout;
     //     QVector<QSharedPointer<Repetition>> m_repetitions;
     //     QVector<QSharedPointer<PointList>> m_polygonPointlists;
-    // Modal variables
+    bool m_offsetFlag;
+    //////////////////////////////
+    //      Modal variables     //
+    //////////////////////////////
     quint32 m_layer, m_datatype;
     QSharedPointer<Repetition> m_repetition;
     QSharedPointer<PointList> m_polygonPointList;
     QSharedPointer<PointList> m_pointList;
-    Placement m_placement;
-    Text m_text; // textlayer, texttype, text-x, text-y, text-propstring
+    QSharedPointer<Placement> m_placementCell;
+    QSharedPointer<Placement> m_placementX;
+    QSharedPointer<Placement> m_placementY;
+    Text m_textString;
+    QSharedPointer<Text> m_textlayer, m_texttype, m_textX, m_textY;
     qint64 m_geometryX, m_geometryY;
     quint32 m_geometryW, m_geometryH;
     bool m_isXYRelative; // xy-mode
@@ -119,7 +126,9 @@ private:
     quint32 m_propStringReference;
     QSharedPointer<Cell> m_currentCell;
 
-
+    
+    
+    
 };
 }
 
