@@ -97,10 +97,11 @@ private:
     QSharedPointer<PointList> m_polygonPointList;
     QSharedPointer<PointList> m_pointList;
     QSharedPointer<Placement> m_placementCell;
-    QSharedPointer<Placement> m_placementX;
-    QSharedPointer<Placement> m_placementY;
-    Text m_textString;
-    QSharedPointer<Text> m_textlayer, m_texttype, m_textX, m_textY;
+    qint64 m_placementX;
+    qint64 m_placementY;
+    QString m_textString;
+    QSharedPointer<Text> m_textlayer, m_texttype;
+    qint64 m_textX, m_textY;
     qint64 m_geometryX, m_geometryY;
     quint32 m_geometryW, m_geometryH;
     bool m_isXYRelative; // xy-mode
@@ -125,7 +126,30 @@ private:
     quint32 m_propNameReference;
     quint32 m_propStringReference;
     QSharedPointer<Cell> m_currentCell;
-
+    union {
+        struct {
+            uint32_t repetition: 1;
+            uint32_t placementCell: 1;
+            uint32_t layer: 1;
+            uint32_t datatype: 1;
+            uint32_t textlayer: 1;
+            uint32_t textdatatype: 1;
+            uint32_t textString: 1;
+            uint32_t xyMode: 1;
+            uint32_t geometryW: 1;
+            uint32_t geometryH: 1;
+            uint32_t polygonPointList: 1;
+            uint32_t pathHalfwidth: 1;
+            uint32_t pathPointList: 1;
+            uint32_t pathStartExtention: 1;
+            uint32_t pathEndExtention: 1;
+            uint32_t ctrapezoidType: 1;
+            uint32_t circleRadius: 1;
+            uint32_t lastPropertyName: 1;
+            uint32_t lastValueList: 1;
+        } m_d;
+        uint32_t m_dummy;
+    } m_modalVariableSetStatus;
     
     
     

@@ -1189,30 +1189,29 @@ oa::Parser::IntervalType oa::Parser::onInterval() {
 
 void oa::Parser::undefineModalVariables()
 {
-    static QSharedPointer<Placement> zeroPlacement(new Placement);
-    static QSharedPointer<Text> zeroText(new Text);
-    // placement-x, placement-y, geometry-x, geometry-y, text-x, and text-y 
-    m_placementX = zeroPlacement;
-    m_placementY = zeroPlacement;
+    // placement-x, placement-y, geometry-x, geometry-y, text-x, and text-y
+    m_placementX = 0;
+    m_placementY = 0;
     m_geometryX = 0;
     m_geometryY = 0;
-    m_textX = zeroText;
-    m_textY = zeroText;
-    m_repetition.reset();
-    m_placementCell.reset();
-    m_layer = -1;
-    m_datatype = -1; 
-    m_textlayer.reset();
-    m_texttype.reset();
-    // TODO add a bitmap to indicate set status
-    // FIXME m_textString
-    // m_isXYRelative
-    m_geometryH = 0;
-    m_geometryW = 0;
-    m_pointList.reset();
-    m_path = Path();
-    m_circleRadius = -1;
-    m_ctrapezoidType = 0;
-    m_lastPropertyName = "";
-    m_lastPropertyValues.clear();
+    m_textX = 0;
+    m_textY = 0;
+    m_modalVariableSetStatus.m_dummy5 = 0;
+//     m_repetition.reset();
+//     m_placementCell.reset();
+//     m_layer = -1;
+//     m_datatype = -1; 
+//     m_textlayer.reset();
+//     m_texttype.reset();
+//     // TODO add a bitmap to indicate set status
+//     // FIXME m_textString
+//     // m_isXYRelative
+//     m_geometryH = 0;
+//     m_geometryW = 0;
+//     m_pointList.reset();
+//     m_path = Path();
+//     m_circleRadius = -1;
+//     m_ctrapezoidType = 0;
+//     m_lastPropertyName = "";
+//     m_lastPropertyValues.clear();
 }
