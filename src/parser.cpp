@@ -185,14 +185,17 @@ bool oa::Parser::onCellName(int type)
     quint32 reference;
     if (m_cellNameMode == Explicit) {
         reference = onUnsigned();
+        // Create a dummy cell
     }
     else {
         reference = m_cellNameReference++;
     }
-    if (m_layout->m_cellNames.find(reference) != m_layout->m_cellNames.end()) {
+
+    if (m_layout->m_cells.find(reference) != m_layout->m_cells.end()) {
+        qFatal("Duplicated cell reference-number");
         return false;
     }
-    m_layout->m_cellNames.insert(reference, name);
+    m_layout->m_cells[reference]= {};
     return true;
 }
 
@@ -297,16 +300,27 @@ bool oa::Parser::onLayerName(int type)
 bool oa::Parser::onCell(int type)
 {
     QSharedPointer<Cell> cell(new Cell);
-    m_layout->m_cells.push_back(cell);
     m_currentCell = cell;
+    quint32 cellReference = 0;
     if (type == 13) {
-        cell->m_index = onUnsigned();
+        cellReference = onUnsigned();
+        auto c = m_layout->m_cells.find(cellReference);
+        if (c != m_layout->m_cells.end()) {
+            if (c->m_cell) {
+                qFatal("Duplicated  cell reference-number");
+            }
+            c->m_cell = cell;
+        } else {
+             // name is not read yet, shall be read in a CellName record
+            m_layout->m_cells[cellReference].m_cell = cell;
+        }
     }
     else {
-        cell->m_index = -m_layout->m_localCellNames.count();
-        m_layout->m_localCellNames.append(onString(N));
+        // TODO name duplication check
+        QString name = onString(N);
+        m_cellLocalNameReference ++;
+        m_layout->m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, cell};
     }
-    m_isXYRelative = false;
     // reset modal variables
     undefineModalVariables();
     return true;
@@ -326,62 +340,62 @@ bool oa::Parser::onXYRelative()
 
 bool oa::Parser::onPlacement(int type)
 {
-    Placement placement;
-    // TODO Wrap these two lines
     quint8 info = 0;
     m_dataStream >> info;
     // CNXYRAAF or CNXYRMAF
     if (info >> 7) { // C
         if ((info >> 6) & 1) { // N
-            m_placementCell->m_index = onUnsigned();
-            // TODO  m_placement.m_index should be in m_layout->m_cellNames
+            m_placementCell->m_referenceNumber = onUnsigned();
+        } else {
+            m_placementCell->m_referenceNumber = -m_layout->m_localCellNames.count();
+            QString name = onString(N);
+            m_layout->m_cells[m_placementCell->m_referenceNumber].m_name = name;
         }
-        else {
-            m_placementCell->m_index = -m_layout->m_localCellNames.count();
-            m_layout->m_localCellNames.append(onString(N));
-        }
+    } else if (!m_modalVariableSetStatus.m_d.placementCell) {
+        qFatal("Modal variable placementCell is undefined");
+        return false;
     }
-    placement.m_index = m_placementCell->m_index;
+
     if (type == 18) {
         if ((info >> 2) & 1) { // M
-            placement.m_manification = onReal();
+            m_placementCell->m_manification = onReal();
         }
         else {
-            placement.m_manification = 1.0;
+            m_placementCell->m_manification = 1.0;
         }
         if ((info >> 1) & 1) { // A
-            placement.m_angle = onReal();
+            m_placementCell->m_angle = onReal();
         }
         else {
-            placement.m_angle = 0.0;
+            m_placementCell->m_angle = 0.0;
         }
     }
+
     if ((info >> 5) & 1) { // X
-        placement.m_x = onSigned();
+        qint64 x = onSigned();
         if (m_isXYRelative) {
-            placement.m_x += m_placementCell->m_x;
+            m_placementCell->m_x += x;
+        } else {
+            m_placementCell->m_x = x;
         }
-        m_placementCell->m_x = placement.m_x;
     }
-    else {
-        placement.m_x = m_placementCell->m_x;
-    }
+
     if ((info >> 4) & 1) { // Y
-        placement.m_y = onSigned();
+        qint64 y = onSigned();
         if (m_isXYRelative) {
-            placement.m_y += m_placementCell->m_y;
+            m_placementCell->m_y += y;
+        } else {
+            m_placementCell->m_y = y;
         }
-        m_placementCell->m_y = placement.m_y;
     }
-    else {
-        placement.m_y = m_placementCell->m_y;
-    }
+
     if ((info >> 3) & 1) { // R
         m_repetition = onRepetition();
-        placement.m_repetition = m_repetition;
+        m_placementCell->m_repetition = m_repetition;
     }
-    placement.m_flip = (info & 0b1); // F
-    m_currentCell->m_placements.append(placement);
+    m_placementCell->m_flip = (info & 0b1); // F
+    m_modalVariableSetStatus.m_d.placementCell = 1;
+    m_currentCell->m_placements.append(*m_placementCell);
     // TODO onProperty
     return true;
 }
@@ -394,47 +408,53 @@ bool oa::Parser::onText()
     // 0CNXYRTL
     if (info >> 6) { // C
         if ((info >> 5) & 1) { // N
-            text.m_index = onUnsigned();
+            m_textString = m_layout->m_textStrings[onUnsigned()];
         }
         else {
-            text.m_index = m_layout->m_localTextStrings.count();
-            m_layout->m_localTextStrings.append(onString(N));
+            m_textString = onString(N);
         }
+
+        m_modalVariableSetStatus.m_d.textString = 1;
     }
     else {
         // use modal TEXTSTRING
-        text.m_index = m_textString.m_index;
+        if (!m_modalVariableSetStatus.m_d.textString) {
+            qFatal("textString is undefined");
+            return false;
+        }
     }
+    text.m_string = m_textString;
+
     if (info & 1) { // L
-        text.m_layer = onUnsigned();
+        m_textLayer = onUnsigned();
     }
-    else {
-        text.m_layer = m_layer;
-    }
+    text.m_textLayer = m_textLayer;
+
     if ((info >> 1) & 1) { // T
-        text.m_datatype = onUnsigned();
+        m_textType = onUnsigned();
     }
-    else {
-        text.m_datatype = m_datatype;
-    }
+    text.m_textType = m_textType;
+
     if ((info >> 4) & 1) { // X
-        text.m_x = onSigned();
+        qint64 x = onSigned();
         if (m_isXYRelative) {
-            text.m_x += m_textString.m_x;
+            m_textX += x;
+        } else {
+            m_textX = x;
         }
     }
-    else {
-        text.m_x = m_textString.m_x;
-    }
+    text.m_x = m_textX;
+
     if ((info >> 3) & 1) { // Y
-        text.m_y = onSigned();
+        qint64 y = onSigned();
         if (m_isXYRelative) {
-            text.m_y += m_textString.m_y;
+            m_textY += y;
+        } else {
+            m_textY = y;
         }
     }
-    else {
-        text.m_y = m_textString.m_y;
-    }
+    text.m_y = m_textY;
+
     if ((info >> 2) & 1) { // R
         text.m_repetition = onRepetition();
     }
@@ -550,7 +570,7 @@ bool oa::Parser::onPolygon()
     return true;
 }
 
-// TODO store m_geometryX at m_path.m_x
+
 bool oa::Parser::onPath()
 {
     Path path;
@@ -568,31 +588,31 @@ bool oa::Parser::onPath()
     path.m_datatype = m_datatype;
 
     if ((info >> 6) & 1) { // W
-        m_path.m_halfWidth = onUnsigned();
+        m_halfWidth = onUnsigned();
     }
-    path.m_halfWidth = m_path.m_halfWidth;
+    path.m_halfWidth = m_halfWidth;
 
     if ((info >> 7) & 1) { // E
         quint8 ext = onUnsigned();
         if ((ext >> 2) & 3) { // SS
-            m_path.m_startExtension = onSigned();
+            m_startExtension = onSigned();
         } else if ((ext >> 2) & 1) { // 0S
-            m_path.m_startExtension = 0;
+            m_startExtension = 0;
         }
          else if ((ext >> 2) & 1) { // S0
-            m_path.m_startExtension = m_path.m_halfWidth;
+            m_startExtension = m_halfWidth;
         }
         if (ext & 3) { // EE
-            m_path.m_endExtension = onSigned();
+            m_endExtension = onSigned();
         } else if (ext & 1) { // 0E
-            m_path.m_endExtension = 0;
+            m_endExtension = 0;
         }
         if (ext & 2) { // E0
-            m_path.m_endExtension = m_path.m_halfWidth;
+            m_endExtension = m_halfWidth;
         }
     }
-    path.m_startExtension = m_path.m_startExtension;
-    path.m_endExtension = m_path.m_endExtension;
+    path.m_startExtension = m_startExtension;
+    path.m_endExtension = m_endExtension;
 
     if ((info >> 5) & 1) { // P
         m_pointList = onPointList(false);
@@ -648,37 +668,49 @@ bool oa::Parser::onTrapezoid(int type)
         m_geometryH = onUnsigned();
     }
     trapezoid.m_height = m_geometryH;
+    qint64 a = 0, b = 0;
     if (type == 23) {
-        trapezoid.m_a = onDelta1();
-        trapezoid.m_b = onDelta1();
+        a = onSigned();
+        b = onSigned();
+    } else if (type == 24) {
+        a = onSigned();
+    } else if (type == 25) {
+        b = onSigned();
     }
-    else if (type == 24) {
-        trapezoid.m_a = onDelta1();
-    }
-    else if (type == 25) {
-        trapezoid.m_b = onDelta1();
+    // FIXME
+    // construct points
+    if ((info >> 7) & 1) { // O
+        trapezoid.m_points << DeltaValue{0, qMax<qint64>(a, 0)};
+        trapezoid.m_points << DeltaValue{0, m_geometryH + qMin<qint64>(b, 0)};
+        trapezoid.m_points << DeltaValue{m_geometryW, m_geometryH - qMax<qint64>(b, 0)};
+        trapezoid.m_points << DeltaValue{m_geometryW, -qMin<qint64>(a, 0)};
+    } else {
+        trapezoid.m_points << DeltaValue{qMax<qint64>(a, 0), m_geometryH};
+        trapezoid.m_points << DeltaValue{m_geometryW + qMin<qint64>(b, 0), m_geometryH};
+        trapezoid.m_points << DeltaValue{m_geometryW - qMax<qint64>(b, 0), 0};
+        trapezoid.m_points << DeltaValue{-qMin<qint64>(a, 0), 0};
     }
     if ((info >> 4) & 1) { // X
-        trapezoid.m_x = onSigned();
+        qint64 x = onSigned();
         if (m_isXYRelative) {
-            trapezoid.m_x += m_geometryX;
+            m_geometryX += x;
+        } else {
+            m_geometryX = x;
         }
     }
-    else {
-        trapezoid.m_x = m_geometryX;
-    }
+    trapezoid.m_x = m_geometryX;
     if ((info >> 3) & 1) { // Y
-        trapezoid.m_y = onSigned();
+        qint64 y = onSigned();
         if (m_isXYRelative) {
-            trapezoid.m_y += m_geometryY;
+            m_geometryY += y;
+        } else {
+            m_geometryY = y;
         }
     }
-    else {
-        trapezoid.m_y = m_geometryY;
-    }
+    trapezoid.m_y = m_geometryY;
+
     if ((info >> 2) & 1) { // R
-        m_repetition = onRepetition();
-        trapezoid.m_repetition = m_repetition;
+        trapezoid.m_repetition = onRepetition();
     }
     m_currentCell->m_trapezoids.append(trapezoid);
 }
@@ -1002,6 +1034,9 @@ QString oa::Parser::onString(StringType type) {
 
 QSharedPointer<oa::Repetition> oa::Parser::onRepetition() {
     quint8 type = onUnsigned();
+    if (type && type < 12) {
+        m_modalVariableSetStatus.m_d.repetition = 1;
+    }
     switch (type)
     {
     case 0:
@@ -1196,7 +1231,7 @@ void oa::Parser::undefineModalVariables()
     m_geometryY = 0;
     m_textX = 0;
     m_textY = 0;
-    m_modalVariableSetStatus.m_dummy5 = 0;
+    m_modalVariableSetStatus.m_dummy = 0;
 //     m_repetition.reset();
 //     m_placementCell.reset();
 //     m_layer = -1;

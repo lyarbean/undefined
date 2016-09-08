@@ -31,8 +31,7 @@ namespace oa {
 struct Cell
 {
     Cell() = default;
-    QString m_name;// TODO use id
-    qint64 m_index;
+    QString m_name;
 //     QVector <> m_properties;
 //     bool m_XYRelative;
 

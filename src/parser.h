@@ -89,30 +89,7 @@ private:
     //     QVector<QSharedPointer<Repetition>> m_repetitions;
     //     QVector<QSharedPointer<PointList>> m_polygonPointlists;
     bool m_offsetFlag;
-    //////////////////////////////
-    //      Modal variables     //
-    //////////////////////////////
-    quint32 m_layer, m_datatype;
-    QSharedPointer<Repetition> m_repetition;
-    QSharedPointer<PointList> m_polygonPointList;
-    QSharedPointer<PointList> m_pointList;
-    QSharedPointer<Placement> m_placementCell;
-    qint64 m_placementX;
-    qint64 m_placementY;
-    QString m_textString;
-    QSharedPointer<Text> m_textlayer, m_texttype;
-    qint64 m_textX, m_textY;
-    qint64 m_geometryX, m_geometryY;
-    quint32 m_geometryW, m_geometryH;
-    bool m_isXYRelative; // xy-mode
-
-    Path m_path; // halfwidth, point-list, start-extension, end-extension
-    quint8 m_ctrapezoidType;
-    quint32 m_circleRadius;
-    // TODO Share  property stuffs?
-    QString m_lastPropertyName;
-    QVector<QVariant> m_lastPropertyValues; // qreal or QString
-    enum Mode {
+        enum Mode {
         Default = 0,
         Explicit,
         Implicit
@@ -121,11 +98,34 @@ private:
     Mode m_textStringMode;
     Mode m_propNameMode;
     Mode m_propStringMode;
+    quint32 m_cellLocalNameReference;
     quint32 m_cellNameReference;
     quint32 m_textStringReference;
     quint32 m_propNameReference;
     quint32 m_propStringReference;
     QSharedPointer<Cell> m_currentCell;
+    //////////////////////////////
+    //      Modal variables     //
+    //////////////////////////////
+    bool m_isXYRelative; // xy-mode
+    QSharedPointer<Repetition> m_repetition;
+    QSharedPointer<PointList> m_polygonPointList;
+    QSharedPointer<PointList> m_pointList;
+    QSharedPointer<Placement> m_placementCell;
+    quint32 m_layer, m_datatype;
+    quint32 m_textLayer, m_textType;
+    qint64 m_placementX;
+    qint64 m_placementY;
+    QString m_textString;
+    qint64 m_textX, m_textY;
+    qint64 m_geometryX, m_geometryY;
+    quint32 m_geometryW, m_geometryH;
+    quint32 m_halfWidth;
+    qint32 m_startExtension, m_endExtension;
+    quint8 m_ctrapezoidType;
+    quint32 m_circleRadius;
+    QString m_lastPropertyName;
+    QVector<QVariant> m_lastValuesList; // qreal or QString
     union {
         struct {
             uint32_t repetition: 1;

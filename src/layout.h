@@ -36,9 +36,9 @@ public:
 /*private:*/
     qreal m_unit;
     QVector<quint32> m_tableOffsets;
+    // TODO put together, and move the following two to parse
     QVector<QString> m_localCellNames;
     QMap<quint32, QString> m_cellNames;
-    QVector<QString> m_localTextStrings;
     QMap<quint32, QString> m_textStrings;
     QVector<QString> m_localLayerNames;
     QMap<quint32, QString> m_layerNames;
@@ -48,9 +48,15 @@ public:
     QMap<quint32, QString> m_propStrings;
     QVector<XName> m_localXNames;
     QMap<quint32, XName> m_xNames;
-    QVector<QSharedPointer<Cell>> m_cells;
+    struct NamedCell {
+        QString m_name;
+        QSharedPointer<Cell> m_cell;
+    };
+    // {cellReference ==> {cellName ==> cellptr}}, if use this form, a cellptr could be null like klayout does
+    QMap<qint64, NamedCell> m_cells;
     QMap<QString, QVector<QPair<quint32, quint32>>> m_layerMap; // cellname to data-layer
 
+    
 };
 }
 

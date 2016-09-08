@@ -15,21 +15,22 @@
 namespace oa {
 struct Placement
 {
-    Placement(): m_index(0), m_manification(0), m_angle(0), m_x(0), m_y(0), m_flip(0), m_repetition(nullptr) {}
-    quint32 m_index;
+    Placement(): m_referenceNumber(-(1<<30)), m_manification(0), m_angle(0), m_x(0), m_y(0), m_flip(0), m_repetition(nullptr) {}
+    QString m_cellName;
     qreal m_manification;
     qreal m_angle;
     qint64 m_x, m_y;
+    qint64 m_referenceNumber;
     bool m_flip;
     QSharedPointer<Repetition> m_repetition;
 };
 
 struct Text {
-    Text() : m_x(0), m_y(0), m_layer(0), m_datatype(0), m_index(0), m_repetition(nullptr) {}
+    Text() : m_x(0), m_y(0), m_textLayer(0), m_textType(0), m_repetition(nullptr) {}
     qint64 m_x, m_y;
-    quint32 m_layer;
-    quint32 m_datatype;
-    quint32 m_index; // Layout::m_localTextStrings or Layout::m_textStrings
+    quint32 m_textLayer;
+    quint32 m_textType;
+    QString m_string;
     QSharedPointer<Repetition> m_repetition;
 };
 
@@ -79,7 +80,7 @@ struct Trapezoid {
     quint32 m_height, m_width;
     quint32 m_layer;
     quint32 m_datatype;
-    Delta1 m_a, m_b;
+    PointList m_points;
     QSharedPointer<Repetition> m_repetition;
 };
 
