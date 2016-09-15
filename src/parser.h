@@ -23,10 +23,10 @@
 #ifndef OA_PARSER_H
 #define OA_PARSER_H
 #include <QString>
-#include "cell.h"
-
-#include <QDataStream>
 #include <QVariant>
+#include "cell.h"
+class QFile;
+
 namespace oa {
 
 class Layout;
@@ -34,7 +34,48 @@ class Parser
 {
     Parser();
     bool open(const QString& filename);
+protected:
+    bool parse();
+    bool beginStart();
+    bool readTableOffsets();
 private:
+    enum RecordType {
+        PAD = 0,
+        START,
+        END,
+        CELLNAME,
+        CELLNAMEX,
+        TEXTSTRING,
+        TEXTSTRINGX,
+        PROPNAME,
+        PROPNAMEX,
+        PROPSTRING,
+        PROPSTRINGX,
+        LAYERNAME,
+        LAYERNAMEX,
+        CELL,
+        CELLX,
+        XYABSOLUTE,
+        XYRELATIVE,
+        PLACEMENT,
+        PLACEMENTX,
+        TEXT,
+        RECTANGLE,
+        POLYGON,
+        PATH,
+        TRAPEZOID,
+        TRAPEZOIDX,
+        TRAPEZOIDY,
+        CTRAPEZOID,
+        CIRCLE,
+        PROPERTY,
+        PROPERTYX,
+        XNAME,
+        XNAMEX,
+        XELEMENT,
+        XGEOMETRY,
+        CBLOCK
+    };
     bool nextRecord();
     // Records
     bool onPad();
@@ -77,19 +118,18 @@ private:
     QString onString(StringType type = A); // TODO Validation
 
     // Composite
-    QSharedPointer<Repetition> onRepetition();
-    QSharedPointer<PointList> onPointList(bool isPolygon);
-    bool onTableOffset();
-    using IntervalType = QPair<quint32, quint32>;
+    bool onRepetition();
+    bool onPointList(bool isPolygon);
+
+    using IntervalType = QPair<quint64, quint64>;
     IntervalType onInterval();
     void undefineModalVariables();
 private:
-    QDataStream m_dataStream;
+    QScopedPointer<QFile> m_dataStream;
     Layout* m_layout;
-    //     QVector<QSharedPointer<Repetition>> m_repetitions;
-    //     QVector<QSharedPointer<PointList>> m_polygonPointlists;
+    QSharedPointer<Cell> m_currentCell;
     bool m_offsetFlag;
-        enum Mode {
+    enum Mode {
         Default = 0,
         Explicit,
         Implicit
@@ -98,12 +138,13 @@ private:
     Mode m_textStringMode;
     Mode m_propNameMode;
     Mode m_propStringMode;
+    Mode m_xNameMode;
     quint32 m_cellLocalNameReference;
     quint32 m_cellNameReference;
     quint32 m_textStringReference;
     quint32 m_propNameReference;
     quint32 m_propStringReference;
-    QSharedPointer<Cell> m_currentCell;
+    quint32 m_xNameReference;
     //////////////////////////////
     //      Modal variables     //
     //////////////////////////////
@@ -111,7 +152,7 @@ private:
     QSharedPointer<Repetition> m_repetition;
     QSharedPointer<PointList> m_polygonPointList;
     QSharedPointer<PointList> m_pointList;
-    QSharedPointer<Placement> m_placementCell;
+    qint64 m_placementCell; // Cell Reference
     quint32 m_layer, m_datatype;
     quint32 m_textLayer, m_textType;
     qint64 m_placementX;
@@ -133,7 +174,7 @@ private:
             uint32_t layer: 1;
             uint32_t datatype: 1;
             uint32_t textlayer: 1;
-            uint32_t textdatatype: 1;
+            uint32_t texttype: 1;
             uint32_t textString: 1;
             uint32_t xyMode: 1;
             uint32_t geometryW: 1;
@@ -150,9 +191,6 @@ private:
         } m_d;
         uint32_t m_dummy;
     } m_modalVariableSetStatus;
-    
-    
-    
 };
 }
 

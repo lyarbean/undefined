@@ -115,7 +115,7 @@ struct XGeometry {
     qint64 m_x, m_y;
     quint32 m_layer;
     quint32 m_datatype;
-    quint32 m_attribute;
+    qint32 m_attribute;
     QString m_string;
     QSharedPointer<Repetition> m_repetition;
 };

@@ -35,7 +35,7 @@ public:
     
 /*private:*/
     qreal m_unit;
-    QVector<quint32> m_tableOffsets;
+    QVector<quint64> m_tableOffsets;
     // TODO put together, and move the following two to parse
     QVector<QString> m_localCellNames;
     QMap<quint32, QString> m_cellNames;
@@ -46,7 +46,6 @@ public:
     QMap<quint32, QString> m_propNames;
     QVector<QString> m_localPropStrings;
     QMap<quint32, QString> m_propStrings;
-    QVector<XName> m_localXNames;
     QMap<quint32, XName> m_xNames;
     struct NamedCell {
         QString m_name;
