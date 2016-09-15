@@ -115,60 +115,60 @@ bool oa::Parser::nextRecord()
 {
     quint64 type = onUnsigned();
     switch (type) {
-    case 0:
+    case PAD:
         return onPad();
-    case 3:
-    case 4:
+    case CELLNAME:
+    case CELLNAMEX:
         return onCellName(type);
-    case 5:
-    case 6:
+    case TEXTSTRING:
+    case TEXTSTRINGX:
         return onTextString(type);
-    case 7:
-    case 8:
+    case PROPNAME:
+    case PROPNAMEX:
         return onPropName(type);
-    case 9:
-    case 10:
+    case PROPSTRING:
+    case PROPSTRINGX:
         return onPropString(type);
-    case 11:
-    case 12:
+    case LAYERNAME:
+    case LAYERNAMEX:
         return onLayerName(type);
-    case 13:
-    case 14:
+    case CELL:
+    case CELLX:
         return onCell(type);
-    case 15:
+    case XYABSOLUTE:
         return onXYAbsolute();
-    case 16:
+    case XYRELATIVE:
         return onXYRelative();
-    case 17:
-    case 18:
+    case PLACEMENT:
+    case PLACEMENTX:
         return onPlacement(type);
-    case 19:
+    case TEXT:
         return onText();
-    case 20:
+    case RECTANGLE:
         return onRectangle();
-    case 21:
+    case POLYGON:
         return onPolygon();
-    case 22:
+    case PATH:
         return onPath();
-    case 23:
-    case 24:
-    case 25:
+    case TRAPEZOID:
+    case TRAPEZOIDX:
+    case TRAPEZOIDY:
         return onTrapezoid(type);
-    case 26:
+    case CTRAPEZOID:
         return onCTrapezoid();
-    case 27:
+    case CIRCLE:
         return onCircle();
-    case 28:
-    case 29:
+    case PROPERTY:
+    case PROPERTYX:
         return onProperty(type);
-    case 30:
-    case 31:
+    case XNAME:
+    case XNAMEX:
         return onXName(type);
-    case 32:
+    case XELEMENT:
         return onXElement();
-    case 33:
+    case XGEOMETRY:
         return onXGeometry();
-    case 34:
+    case CBLOCK:
         return onCBlock();
     default:
         return false;
