@@ -31,31 +31,19 @@ namespace oa {
 class Layout
 {
 public:
-    Layout();
-    
-/*private:*/
+    Layout() : m_unit(1) {}
     qreal m_unit;
-    QVector<quint64> m_tableOffsets;
-    // TODO put together, and move the following two to parse
-    QVector<QString> m_localCellNames;
-    QMap<quint32, QString> m_cellNames;
     QMap<quint32, QString> m_textStrings;
-    QVector<QString> m_localLayerNames;
-    QMap<quint32, QString> m_layerNames;
-    QVector<QString> m_localPropNames;
     QMap<quint32, QString> m_propNames;
-    QVector<QString> m_localPropStrings;
     QMap<quint32, QString> m_propStrings;
     QMap<quint32, XName> m_xNames;
+    QMap<QString, QVector<QPair<quint32, quint32>>> m_layerNames; // cellname to data-layer
     struct NamedCell {
         QString m_name;
         QSharedPointer<Cell> m_cell;
     };
-    // {cellReference ==> {cellName ==> cellptr}}, if use this form, a cellptr could be null like klayout does
     QMap<qint64, NamedCell> m_cells;
-    QMap<QString, QVector<QPair<quint32, quint32>>> m_layerMap; // cellname to data-layer
 
-    
 };
 }
 

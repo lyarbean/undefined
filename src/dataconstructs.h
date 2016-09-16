@@ -22,13 +22,13 @@
 
 #ifndef OA_REAL_H
 #define OA_REAL_H
-
+// NOTE UNUSED
 #include <QtCore/QByteArray>
 namespace oa {
 
 struct UnsignedInteger {
     static quint64 decode (const QByteArray& data);
-        enum {
+    enum {
         Type = 0
     };
     static int type()  {

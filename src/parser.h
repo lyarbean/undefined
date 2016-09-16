@@ -32,7 +32,8 @@ namespace oa {
 class Layout;
 class Parser
 {
-    Parser();
+public:
+    Parser(Layout& layout);
     bool open(const QString& filename);
 protected:
     bool parse();
@@ -106,7 +107,6 @@ private:
     quint64 onUnsigned();
     qint64 onSigned();
     double onReal();
-    Delta1 onDelta1();
     Delta23 onDelta2();
     Delta23 onDelta3();
     DeltaG onDeltaG();
@@ -125,8 +125,8 @@ private:
     IntervalType onInterval();
     void undefineModalVariables();
 private:
+    Layout& m_layout;
     QScopedPointer<QFile> m_dataStream;
-    Layout* m_layout;
     QSharedPointer<Cell> m_currentCell;
     bool m_offsetFlag;
     enum Mode {
@@ -145,6 +145,7 @@ private:
     quint32 m_propNameReference;
     quint32 m_propStringReference;
     quint32 m_xNameReference;
+    QVector<quint64> m_tableOffsets;
     //////////////////////////////
     //      Modal variables     //
     //////////////////////////////

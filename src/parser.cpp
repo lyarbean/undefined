@@ -24,12 +24,11 @@
 
 #include <QDataStream>
 #include <QFile>
-
 #include "layout.h"
 
 // TODO Add exception to ease life
-oa::Parser::Parser()
-    : m_layout(nullptr), m_offsetFlag(true),
+oa::Parser::Parser(Layout& layout)
+    : m_layout(layout), m_offsetFlag(true),
       m_cellNameMode(Default),
       m_textStringMode(Default),
       m_propNameMode(Default),
@@ -60,8 +59,6 @@ bool oa::Parser::open(const QString& filename) {
         qFatal("Not an oasis");
         return false;
     }
-    // TODO
-    m_layout = new Layout;
     return parse();
 }
 
@@ -183,13 +180,13 @@ bool oa::Parser::onStart()
     if (strcmp(version, "1.0")) {
         return false;
     }
-    m_layout->m_unit = onReal(); // validation
+    m_layout.m_unit = onReal(); // validation
     qint64 currentPos =  m_dataStream->pos();
     m_offsetFlag = onUnsigned();
 
     if (!m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
-            m_layout->m_tableOffsets << onUnsigned(); // TODO rename
+            m_tableOffsets << onUnsigned(); // TODO rename
         }
 
     } else { // onEndEx()
@@ -209,12 +206,12 @@ bool oa::Parser::onStart()
 
 bool oa::Parser:: readTableOffsets() {
     quint32 cellnameOffset, textstringOffset, propnameOffset, propstringOffset, layernameOffset, xnameOffset;
-    cellnameOffset = m_layout->m_tableOffsets.at(1);
-    textstringOffset = m_layout->m_tableOffsets.at(3);
-    propnameOffset = m_layout->m_tableOffsets.at(5);
-    propstringOffset = m_layout->m_tableOffsets.at(7);
-    layernameOffset = m_layout->m_tableOffsets.at(9);
-    xnameOffset = m_layout->m_tableOffsets.at(11);
+    cellnameOffset = m_tableOffsets.at(1);
+    textstringOffset = m_tableOffsets.at(3);
+    propnameOffset = m_tableOffsets.at(5);
+    propstringOffset = m_tableOffsets.at(7);
+    layernameOffset = m_tableOffsets.at(9);
+    xnameOffset = m_tableOffsets.at(11);
     if (cellnameOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(cellnameOffset);
@@ -293,7 +290,7 @@ bool oa::Parser::onEnd()
 {
     if (m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
-            m_layout->m_tableOffsets << onUnsigned();
+            m_tableOffsets << onUnsigned();
         }
     }
     // padding string
@@ -325,15 +322,15 @@ bool oa::Parser::onCellName(int type)
         reference = m_cellNameReference++;
     }
 
-    auto namedCell = m_layout->m_cells.find(reference);
-    if (namedCell != m_layout->m_cells.end()) {
+    auto namedCell = m_layout.m_cells.find(reference);
+    if (namedCell != m_layout.m_cells.end()) {
         if (!namedCell->m_name.isEmpty()) {
             qFatal("Duplicated cell reference-number");
             return false;
         }
     }
     // update or create
-    m_layout->m_cells[reference].m_name = name;
+    m_layout.m_cells[reference].m_name = name;
     // A2-2.1 Any cell-level standard properties must appear immediately after the corresponding CELLNAME record in
     // an OASIS file. Use of cell-level standard properties is optional—OASIS processors may omit/ignore any or all of
     // them.
@@ -363,10 +360,10 @@ bool oa::Parser::onTextString(int type)
     else {
         reference = m_textStringReference++;
     }
-    if (m_layout->m_textStrings.find(reference) != m_layout->m_textStrings.end()) {
+    if (m_layout.m_textStrings.find(reference) != m_layout.m_textStrings.end()) {
         return false;
     }
-    m_layout->m_textStrings.insert(reference, name);
+    m_layout.m_textStrings.insert(reference, name);
     return true;
 }
 
@@ -392,10 +389,10 @@ bool oa::Parser::onPropName(int type)
     else {
         reference = m_propNameReference++;
     }
-    if (m_layout->m_propNames.find(reference) != m_layout->m_propNames.end()) {
+    if (m_layout.m_propNames.find(reference) != m_layout.m_propNames.end()) {
         return false;
     }
-    m_layout->m_propNames.insert(reference, name);
+    m_layout.m_propNames.insert(reference, name);
     return true;
 }
 
@@ -421,10 +418,10 @@ bool oa::Parser::onPropString(int type)
     else {
         reference = m_propStringReference++;
     }
-    if (m_layout->m_propStrings.find(reference) != m_layout->m_propStrings.end()) {
+    if (m_layout.m_propStrings.find(reference) != m_layout.m_propStrings.end()) {
         return false;
     }
-    m_layout->m_propStrings.insert(reference, name);
+    m_layout.m_propStrings.insert(reference, name);
     return true;
 }
 
@@ -434,7 +431,7 @@ bool oa::Parser::onLayerName(int type)
     QString name = onString(N);
     IntervalType interval = onInterval();
     // TODO Merge
-    QVector<QPair<quint32, quint32>>& dataLayers = m_layout->m_layerMap[name];
+    QVector<QPair<quint32, quint32>>& dataLayers = m_layout.m_layerNames[name];
     dataLayers.append(interval);
     return true;
 }
@@ -446,22 +443,22 @@ bool oa::Parser::onCell(int type)
     quint32 cellReference = 0;
     if (type == 13) {
         cellReference = onUnsigned();
-        auto c = m_layout->m_cells.find(cellReference);
-        if (c != m_layout->m_cells.end()) {
+        auto c = m_layout.m_cells.find(cellReference);
+        if (c != m_layout.m_cells.end()) {
             if (c->m_cell) {
                 qFatal("Duplicated  cell reference-number");
             }
             c->m_cell = cell;
         } else {
             // name is not read yet, shall be read in a CellName record
-            m_layout->m_cells[cellReference].m_cell = cell;
+            m_layout.m_cells[cellReference].m_cell = cell;
         }
     }
     else {
         // TODO name duplication check
         QString name = onString(N);
         m_cellLocalNameReference ++;
-        m_layout->m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, cell};
+        m_layout.m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, cell};
     }
     // reset modal variables
     undefineModalVariables();
@@ -511,11 +508,11 @@ bool oa::Parser::onPlacement(int type)
     if (info >> 7) { // C
         if ((info >> 6) & 1) { // N
             m_placementCell = onUnsigned();
-            if (m_layout->m_cells.find(m_placementCell) == m_layout->m_cells.end()) {
+            if (m_layout.m_cells.find(m_placementCell) == m_layout.m_cells.end()) {
                 // FIXME CellName not read yet
                 return false;
             }
-            placement.m_cellName = m_layout->m_cells[m_placementCell].m_name;
+            placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
         } else {
             placement.m_cellName = onString(N);
         }
@@ -524,7 +521,7 @@ bool oa::Parser::onPlacement(int type)
         qFatal("Modal variable placementCell is undefined");
         return false;
     }  else {
-        placement.m_cellName = m_layout->m_cells[m_placementCell].m_name;
+        placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
     }
 
     if (type == 18) {
@@ -585,7 +582,7 @@ bool oa::Parser::onText()
     // 0CNXYRTL
     if (info >> 6) { // C
         if ((info >> 5) & 1) { // N
-            m_textString = m_layout->m_textStrings[onUnsigned()]; // FIXME could be ;empty now?
+            m_textString = m_layout.m_textStrings[onUnsigned()]; // FIXME could be ;empty now?
         }
         else {
             m_textString = onString(N);
@@ -1106,12 +1103,12 @@ bool oa::Parser::onProperty(int type)
     if ((info >> 2) & 1) { // C
         if ((info >> 1) & 1) { // N
             quint64 i = onUnsigned();
-            if (m_layout->m_propNames.find(i) == m_layout->m_propNames.end()) {
+            if (m_layout.m_propNames.find(i) == m_layout.m_propNames.end()) {
                 // TODO Klayout introduces a forward  name table to delay reference
                 // we assume we are in strict mode
                 return false;
             }
-            m_lastPropertyName = m_layout->m_propNames[i];
+            m_lastPropertyName = m_layout.m_propNames[i];
         }
         else {
             m_lastPropertyName = onString(N);
@@ -1197,7 +1194,7 @@ bool oa::Parser::onXName(int type)
     else {
         reference = m_xNameReference++;
     }
-    m_layout->m_xNames[reference] = xname;
+    m_layout.m_xNames[reference] = xname;
 
 }
 
@@ -1335,10 +1332,6 @@ double oa::Parser::onReal() {
         // TODO report BAD_STATUS
         return 0.0;
     }
-}
-
-oa::Delta1 oa::Parser::onDelta1() {
-    return Delta1(onSigned());
 }
 
 

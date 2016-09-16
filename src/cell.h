@@ -25,16 +25,12 @@
 #include <QString>
 #include <QVector>
 #include "records.h"
-#include "polygon.h"
+
 namespace oa {
 
 struct Cell
 {
     Cell() = default;
-//     QString m_name;
-//     QVector <> m_properties;
-//     bool m_XYRelative;
-
     QVector<Rectangle> m_rectangles;
     QVector<Polygon> m_polygons;
     QVector<Path> m_paths;
@@ -45,7 +41,6 @@ struct Cell
     QVector<Placement> m_placements;
     QVector<Text> m_texts;
     QVector<XELement> m_xelements;
-
 };
 }
 

@@ -23,28 +23,6 @@
 #include "delta.h"
 #include <QDebug>
 
-// 7.5.2 A 1-delta is stored as a signed-integer and represents a horizontal or vertical displacement. Bit 0 encodes direc-
-// tion: 0 for east or north, 1 for west or south. The remaining bits are the magnitude. Horizontal or vertical alignment is
-// implied by context.
-oa::Delta1::Delta1(qint64 magnitude) :  m_magnitude(magnitude)
-{
-}
-
-// FIXME
-oa::DeltaValue oa::Delta1::value(int direction) const
-{
-    switch (direction) {
-    case 0:
-        return {m_magnitude, 0};
-        return {0, m_magnitude};
-    case 1:
-        return {0, - m_magnitude};
-    default:
-        // qFatal
-        return {0, 0};
-    }
-}
-
 // 7.5.3 A 2-delta is stored as an unsigned-integer and represents a horizontal or vertical displacement. Bits 0-1 encode
 // direction: 0 for east, 1 for north, 2 for west, and 3 for south. The remaining bits are the magnitude.
 
