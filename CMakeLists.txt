@@ -18,11 +18,11 @@ set(oasisreader_SRC
 
 set(parser_SRC
 # src/dataconstructs.cpp
-src/repetition.cpp
-src/delta.cpp
+# src/repetition.cpp
+# src/delta.cpp
 src/records.cpp
-src/pointlist.cpp
-src/layout.cpp
+# src/pointlist.cpp
+# src/layout.cpp
 src/parser.cpp)
 
 add_library(parser ${parser_SRC})

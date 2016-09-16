@@ -24,7 +24,7 @@
 
 #include <QDataStream>
 #include <QFile>
-#include "layout.h"
+
 
 // TODO Add exception to ease life
 oa::Parser::Parser(Layout& layout)

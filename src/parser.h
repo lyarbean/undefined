@@ -24,7 +24,9 @@
 #define OA_PARSER_H
 #include <QString>
 #include <QVariant>
-#include "cell.h"
+
+#include "records.h"
+
 class QFile;
 
 namespace oa {
