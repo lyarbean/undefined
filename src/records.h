@@ -27,15 +27,15 @@ struct Delta23 {
 };
 
 struct DeltaG {
-    // For delta g1, direction is one of east, north, west, south, northeast, northwest, southwest, and southeast.
-    // and m_y is 2^64 - 1, m_x is the magnitude.
-    // For delta g2, direction is one of northeast, northwest, southwest, and southeast.
     DeltaG(quint64 magnitude = 0);
     DeltaG(qint64 x = 0, qint64 y = 0);
     DeltaValue value;
 };
 
 using PointList = QVector<DeltaValue>;
+
+// TODO A repetition holds positions to repeate shape. 
+// To improve rendering, we may just give some positions that fit a given boundry.
 
 struct Repetition
 {
@@ -45,7 +45,7 @@ struct Repetition
     virtual int type() const {
         return Type;
     }
-    virtual QVector<DeltaValue> values() {} // TODO purize
+    virtual QVector<DeltaValue> values() {}
 };
 
 struct Repetition1 : public Repetition {
@@ -210,12 +210,11 @@ struct Repetition11 : public Repetition {
 
 struct Placement
 {
-    Placement(): m_referenceNumber(-(1<<30)), m_manification(0), m_angle(0), m_x(0), m_y(0), m_flip(0), m_repetition(nullptr) {}
+    Placement(): m_manification(0), m_angle(0), m_x(0), m_y(0), m_flip(0), m_repetition(nullptr) {}
     QString m_cellName;
     qreal m_manification;
     qreal m_angle;
     qint64 m_x, m_y;
-    qint64 m_referenceNumber;
     bool m_flip;
     QSharedPointer<Repetition> m_repetition;
 };
@@ -323,6 +322,7 @@ struct Cell
     QVector<Text> m_texts;
     QVector<XELement> m_xelements;
 };
+
 class Layout
 {
 public:
@@ -338,6 +338,8 @@ public:
         QSharedPointer<Cell> m_cell;
     };
     QMap<qint64, NamedCell> m_cells;
+    // auto cell = m_cells[m_cellNameToReference[cellname]];
+    QMap<QString, qint64> m_cellNameToReference;
 };
 }
 #endif // OA_RECORDS_H

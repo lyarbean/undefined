@@ -69,7 +69,6 @@ oa::Delta23::Delta23(quint64 magnitude, bool isTwo)
 // remaining bits of the second integer represent the magnitude in the y-direction. Both forms may appear in a list of g-
 // deltas.
 
-
 oa::DeltaG::DeltaG(quint64 magnitude)
 {
     qint64 m = static_cast<qint64>(magnitude >> 4);

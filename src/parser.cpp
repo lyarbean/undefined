@@ -24,9 +24,8 @@
 
 #include <QDataStream>
 #include <QFile>
+#include <stdexcept>
 
-
-// TODO Add exception to ease life
 oa::Parser::Parser(Layout& layout)
     : m_layout(layout), m_offsetFlag(true),
       m_cellNameMode(Default),
@@ -36,11 +35,12 @@ oa::Parser::Parser(Layout& layout)
       m_xNameMode(Default),
       m_cellLocalNameReference(0),
       m_cellNameReference(0),
-      m_textStringReference(0),
+      m_textStringReference(0), 
       m_propNameReference(0),
       m_propStringReference(0),
       m_xNameReference(0)
 {
+    qWarning("Initialize Parser");
     undefineModalVariables();
 }
 
@@ -49,23 +49,28 @@ bool oa::Parser::open(const QString& filename) {
     if (!m_dataStream->open(QIODevice::ReadOnly)) {
         return false;
     }
+    bool r = false;
+    try {
+        static char magicBytes[13];
+        if (m_dataStream->read(magicBytes, 13) != 13) {
+            throw std::domain_error("open: Read error");
+        }
+        if (strcmp(magicBytes, "%SEMI-OASIS\r\n")) {
+            throw std::domain_error("No magicBytes found");
 
-    static char magicBytes[13];
-    if (m_dataStream->read(magicBytes, 13) != 13) {
-        qFatal("Not an oasis");
-        return false;
+        }
+        r = parse();
+    } catch (std::exception& e) {
+        qWarning(e.what());
     }
-    if (strcmp(magicBytes, "%SEMI-OASIS\r\n")) {
-        qFatal("Not an oasis");
-        return false;
-    }
-    return parse();
+    m_dataStream.reset();
+    return r;
 }
 
 bool oa::Parser::parse() {
     // Handle START and END first
     if (!beginStart()) {
-        return false;
+        throw std::domain_error("Fail to parse beginStart");
     }
     // A2-1.1 Any file-level standard properties must appear immediately after the START record in an OASIS file. Use of
     // file-level standard properties is optional—OASIS processors may omit/ignore any or all of them.
@@ -81,19 +86,19 @@ bool oa::Parser::parse() {
         case CELLX:
         case CELLNAME ... LAYERNAMEX:
             if (!nextRecord()) {
-                return false;
+                throw std::domain_error("parse: Read error");
             }
             break;
         case END:
             if (m_dataStream->pos() != m_dataStream->size() - 256) {
-                return false;
+                throw std::domain_error("parse End Read error");
             }
             return true;
         case START: // START again
-            return false;
+            throw std::domain_error("parse: START again? Parse Error");
             break;
         default:
-            return false;
+            throw std::domain_error("parse: Parse Error");
             break;
         }
     }
@@ -101,8 +106,8 @@ bool oa::Parser::parse() {
 
 bool oa::Parser::beginStart() {
     quint8 type = onUnsigned();
-    if (type != 0) {
-        return false;
+    if (type != 1) {
+        throw std::domain_error("beginStart: No START?");
     }
     return onStart();
 }
@@ -168,36 +173,34 @@ bool oa::Parser::nextRecord()
     case CBLOCK:
         return onCBlock();
     default:
-        return false;
+        throw std::domain_error(QString("nextRecord: unintended type:%1").arg(type).toStdString());
     }
 }
 bool oa::Parser::onStart()
 {
-    static char version[3];
-    if (m_dataStream->read(version, 3) != 3) {
-        return false;
-    }
-    if (strcmp(version, "1.0")) {
-        return false;
+    QString version = onString(N);
+    if (version != "1.0") {
+        throw std::domain_error(QString("onStart: invalid VERSION [%1][%2]").arg(version).arg(version.count()).toStdString());
     }
     m_layout.m_unit = onReal(); // validation
-    qint64 currentPos =  m_dataStream->pos();
+    qint64 currentPos;
     m_offsetFlag = onUnsigned();
 
     if (!m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
             m_tableOffsets << onUnsigned(); // TODO rename
         }
-
+        currentPos = m_dataStream->pos();
     } else { // onEndEx()
-        qint64 endOffset = m_dataStream->size() - 256;
+        currentPos = m_dataStream->pos();
+        qint64 endOffset = m_dataStream->size() - 255; // END at -256
         m_dataStream->seek(endOffset);
         if (!onEnd()) {
-            return false;
+            throw std::domain_error("fail to parse onEnd");
         }
     }
     if (!readTableOffsets()) {
-        return false;
+        throw std::domain_error("fail to parse readTableOffsets");
     }
     m_dataStream->seek(currentPos);
     return true;
@@ -212,69 +215,94 @@ bool oa::Parser:: readTableOffsets() {
     propstringOffset = m_tableOffsets.at(7);
     layernameOffset = m_tableOffsets.at(9);
     xnameOffset = m_tableOffsets.at(11);
+
     if (cellnameOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(cellnameOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 3 || type == 4) {
-            onUnsigned();
-            if(!onCellName(type)) {
-                return false;
+        while (true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 3 || type == 4) {
+                m_dataStream->read(1);
+                if(!onCellName(type)) {
+                    throw std::domain_error("readTableOffsets: onCellName");
+                }
+            } else {
+                break;
             }
         }
     }
     if (textstringOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(textstringOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 5 || type == 6) {
-            onUnsigned();
-            if(!onText()) {
-                return false;
+        while (true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 5 || type == 6) {
+                m_dataStream->read(1);
+                if(!onTextString(type)) {
+                    throw std::domain_error("readTableOffsets: onTextString");
+                }
+            } else {
+                break;
             }
         }
     }
     if (propnameOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(propnameOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 7 || type == 8) {
-            onUnsigned();
-            if(!onPropName(type)) {
-                return false;
+        while (true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 7 || type == 8) {
+                m_dataStream->read(1);
+                if(!onPropName(type)) {
+                    throw std::domain_error("readTableOffsets: onPropName");
+                }
+            } else {
+                break;
             }
         }
     }
     if (propstringOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(propstringOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 9 || type == 10) {
-            onUnsigned();
-            if(!onPropString(type)) {
-                return false;
+        while (true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 9 || type == 10) {
+                m_dataStream->read(1);
+                if(!onPropString(type)) {
+                    throw std::domain_error("readTableOffsets: onPropString");
+                }
+            } else {
+                break;
             }
         }
     }
     if (layernameOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(layernameOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 11 || type == 12) {
-            onUnsigned();
-            if(!onLayerName(type)) {
-                return false;
+        while (true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 11 || type == 12) {
+                m_dataStream->read(1);
+                if(!onLayerName(type)) {
+                    throw std::domain_error("readTableOffsets: onLayerName");
+                }
+            } else {
+                break;
             }
         }
     }
     if (xnameOffset) {
         // peek first since we're doing read ahead
         m_dataStream->seek(xnameOffset);
-        quint8 type = m_dataStream->peek(1)[0];
-        while (type == 30 || type == 31) {
-            onUnsigned();
-            if(!onXName(type)) {
-                return false;
+        while(true) {
+            quint8 type = m_dataStream->peek(1)[0];
+            if (type == 30 || type == 31) {
+                m_dataStream->read(1);
+                if(!onXName(type)) {
+                    throw std::domain_error("readTableOffsets: onXName");
+                }
+            } else {
+                break;
             }
         }
     }
@@ -293,10 +321,12 @@ bool oa::Parser::onEnd()
             m_tableOffsets << onUnsigned();
         }
     }
+    return true;
+    // TODO validation
     // padding string
-    int size = 255 - (m_offsetFlag ? 12 : 0);
-    char endBytes[256];
-    return m_dataStream->read(endBytes, size) == size;
+//     int size = 255 - (m_offsetFlag ? 12 : 0);
+//     char endBytes[256];
+//     return m_dataStream->read(endBytes, size) == size;
 }
 
 bool oa::Parser::onCellName(int type)
@@ -311,8 +341,7 @@ bool oa::Parser::onCellName(int type)
         }
     }
     if ((m_cellNameMode == Implicit && type == 4) || (m_cellNameMode == Explicit && type == 3)) {
-        qWarning("Both Implicit and Explicit CellName!");
-        return false;
+        throw std::domain_error("Both Implicit and Explicit CellName!");
     }
     quint32 reference;
     if (m_cellNameMode == Explicit) {
@@ -325,12 +354,12 @@ bool oa::Parser::onCellName(int type)
     auto namedCell = m_layout.m_cells.find(reference);
     if (namedCell != m_layout.m_cells.end()) {
         if (!namedCell->m_name.isEmpty()) {
-            qFatal("Duplicated cell reference-number");
-            return false;
+            throw std::domain_error("Duplicated CELLNAME reference-number");
         }
     }
     // update or create
     m_layout.m_cells[reference].m_name = name;
+    m_layout.m_cellNameToReference[name] = reference;
     // A2-2.1 Any cell-level standard properties must appear immediately after the corresponding CELLNAME record in
     // an OASIS file. Use of cell-level standard properties is optional—OASIS processors may omit/ignore any or all of
     // them.
@@ -350,18 +379,18 @@ bool oa::Parser::onTextString(int type)
         }
     }
     if ((m_textStringMode == Implicit && type == 6) || (m_textStringMode == Explicit && type == 5)) {
-        qWarning("Both Implicit and Explicit textString!");
-        return false;
+        throw std::domain_error("Both Implicit and Explicit textString!");
     }
     quint32 reference;
     if (m_textStringMode == Explicit) {
         reference = onUnsigned();
     }
     else {
-        reference = m_textStringReference++;
+        reference = m_textStringReference;
+        m_textStringReference++;
     }
     if (m_layout.m_textStrings.find(reference) != m_layout.m_textStrings.end()) {
-        return false;
+        throw std::domain_error("Duplicated TEXTSTRING reference-number");
     }
     m_layout.m_textStrings.insert(reference, name);
     return true;
@@ -379,8 +408,7 @@ bool oa::Parser::onPropName(int type)
         }
     }
     if ((m_propNameMode == Implicit && type == 8) || (m_propNameMode == Explicit && type == 7)) {
-        qWarning("Both Implicit and Explicit PropName!");
-        return false;
+        throw std::domain_error("Both Implicit and Explicit PropName!");
     }
     quint32 reference;
     if (m_propNameMode == Explicit) {
@@ -390,7 +418,7 @@ bool oa::Parser::onPropName(int type)
         reference = m_propNameReference++;
     }
     if (m_layout.m_propNames.find(reference) != m_layout.m_propNames.end()) {
-        return false;
+        throw std::domain_error("Duplicated PROPNAME reference-number");
     }
     m_layout.m_propNames.insert(reference, name);
     return true;
@@ -408,8 +436,7 @@ bool oa::Parser::onPropString(int type)
         }
     }
     if ((m_propStringMode == Implicit && type == 10) || (m_propStringMode == Explicit && type == 9)) {
-        qWarning("Both Implicit and Explicit PropString!");
-        return false;
+        throw std::domain_error("Both Implicit and Explicit PropString!");
     }
     quint32 reference;
     if (m_propStringMode == Explicit) {
@@ -419,7 +446,7 @@ bool oa::Parser::onPropString(int type)
         reference = m_propStringReference++;
     }
     if (m_layout.m_propStrings.find(reference) != m_layout.m_propStrings.end()) {
-        return false;
+        throw std::domain_error("Duplicated PROPSTRING reference-number");
     }
     m_layout.m_propStrings.insert(reference, name);
     return true;
@@ -428,7 +455,9 @@ bool oa::Parser::onPropString(int type)
 bool oa::Parser::onLayerName(int type)
 {
     Q_UNUSED(type);
+//     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
     QString name = onString(N);
+//     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
     IntervalType interval = onInterval();
     // TODO Merge
     QVector<QPair<quint32, quint32>>& dataLayers = m_layout.m_layerNames[name];
@@ -440,25 +469,24 @@ bool oa::Parser::onCell(int type)
 {
     QSharedPointer<Cell> cell(new Cell);
     m_currentCell = cell;
-    quint32 cellReference = 0;
     if (type == 13) {
-        cellReference = onUnsigned();
+        quint32 cellReference = onUnsigned();
         auto c = m_layout.m_cells.find(cellReference);
         if (c != m_layout.m_cells.end()) {
             if (c->m_cell) {
-                qFatal("Duplicated  cell reference-number");
+                qWarning("Duplicated  cell reference-number");
             }
             c->m_cell = cell;
         } else {
             // name is not read yet, shall be read in a CellName record
             m_layout.m_cells[cellReference].m_cell = cell;
         }
-    }
-    else {
+    } else {
         // TODO name duplication check
         QString name = onString(N);
         m_cellLocalNameReference ++;
         m_layout.m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, cell};
+        m_layout.m_cellNameToReference[name] = -static_cast<qint64>(m_cellLocalNameReference);
     }
     // reset modal variables
     undefineModalVariables();
@@ -471,14 +499,14 @@ bool oa::Parser::onCell(int type)
         case XELEMENT:
         case XGEOMETRY:
             if (!nextRecord()) {
-                return false;
+                throw std::domain_error("onCell: parse error");
             }
             break;
         case START: // START again
-            return false;
+            throw std::domain_error("onCell: START again");
             break;
         default:
-            return true; // Handle on parse
+            return true; // Handle on parse()
             break;
         }
     }
@@ -501,7 +529,7 @@ bool oa::Parser::onPlacement(int type)
 {
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onPlacement: read error");
     }
     Placement placement;
     // CNXYRAAF or CNXYRMAF
@@ -510,7 +538,7 @@ bool oa::Parser::onPlacement(int type)
             m_placementCell = onUnsigned();
             if (m_layout.m_cells.find(m_placementCell) == m_layout.m_cells.end()) {
                 // FIXME CellName not read yet
-                return false;
+//                 return false;
             }
             placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
         } else {
@@ -518,8 +546,7 @@ bool oa::Parser::onPlacement(int type)
         }
         m_modalVariableSetStatus.m_d.placementCell = 1;
     } else if (!m_modalVariableSetStatus.m_d.placementCell) {
-        qFatal("Modal variable placementCell is undefined");
-        return false;
+        throw std::domain_error("Modal variable placementCell is undefined");
     }  else {
         placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
     }
@@ -562,7 +589,7 @@ bool oa::Parser::onPlacement(int type)
 
     if ((info >> 3) & 1) { // R
         if(!onRepetition()) {
-            return false;
+             throw std::domain_error("onPlacement: no Repetition");
         }
         placement.m_repetition = m_repetition;
     }
@@ -577,42 +604,43 @@ bool oa::Parser::onText()
     Text text;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onText: read error");
     }
     // 0CNXYRTL
     if (info >> 6) { // C
         if ((info >> 5) & 1) { // N
-            m_textString = m_layout.m_textStrings[onUnsigned()]; // FIXME could be ;empty now?
+            // t3.4.oas
+            // FIXME could be ;empty now?
+            quint32 reference = onUnsigned();
+            if (m_layout.m_textStrings.find(reference) == m_layout.m_textStrings.end()) {
+                throw std::domain_error("onText: TEXTSTRING not found");
+            }
+            m_textString = m_layout.m_textStrings[reference]; 
         }
         else {
             m_textString = onString(N);
         }
-
+        qWarning(m_textString.toStdString().c_str());
         m_modalVariableSetStatus.m_d.textString = 1;
     }
-    if (!m_modalVariableSetStatus.m_d.textString) {
-        qFatal("textString is undefined");
-        return false;
-    }
-
-    text.m_string = m_textString;
 
     if (info & 1) { // L
         m_textLayer = onUnsigned();
         m_modalVariableSetStatus.m_d.textlayer = 1;
     }
-    if (!m_modalVariableSetStatus.m_d.textlayer) {
-        return false;
-    }
-    text.m_textLayer = m_textLayer;
 
     if ((info >> 1) & 1) { // T
         m_textType = onUnsigned();
         m_modalVariableSetStatus.m_d.texttype = 1;
     }
-    if (!m_modalVariableSetStatus.m_d.texttype) {
-        return false;
+
+    if (!(m_modalVariableSetStatus.m_d.texttype & m_modalVariableSetStatus.m_d.textlayer
+            & m_modalVariableSetStatus.m_d.textString)) {
+        throw std::domain_error("onText: required modal variables not set");
     }
+
+    text.m_string = m_textString;
+    text.m_textLayer = m_textLayer;
     text.m_textType = m_textType;
 
     if ((info >> 4) & 1) { // X
@@ -637,7 +665,7 @@ bool oa::Parser::onText()
 
     if ((info >> 2) & 1) { // R
         if (!onRepetition()) {
-            return false;
+            throw std::domain_error("No Repetition");
         }
         text.m_repetition = m_repetition;
     }
@@ -650,7 +678,7 @@ bool oa::Parser::onRectangle()
     Rectangle rectangle;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onRectangle: read error");
     }
     // SWHXTRDL
     if (info & 1) { // L
@@ -681,7 +709,7 @@ bool oa::Parser::onRectangle()
     rectangle.m_height = m_geometryH;
     if (!(m_modalVariableSetStatus.m_d.layer & m_modalVariableSetStatus.m_d.datatype
             & m_modalVariableSetStatus.m_d.geometryW  & m_modalVariableSetStatus.m_d.geometryH)) {
-        return false;
+        throw std::domain_error("onRectangle: required modal variables not set");
     }
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned();
@@ -718,7 +746,7 @@ bool oa::Parser::onPolygon()
     Polygon polygon;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onPolygon: read error");
     }
     // 00PXYRDL
     if (info & 1) { // L
@@ -737,12 +765,9 @@ bool oa::Parser::onPolygon()
         }
         m_modalVariableSetStatus.m_d.polygonPointList = 1;
     }
-    if (!m_modalVariableSetStatus.m_d.polygonPointList) {
-        return false;
-    }
     if (!(m_modalVariableSetStatus.m_d.layer & m_modalVariableSetStatus.m_d.datatype
             & m_modalVariableSetStatus.m_d.polygonPointList)) {
-        return false;
+        throw std::domain_error("onPolygon: required modal variables not set");
     }
     polygon.m_layer = m_layer;
     polygon.m_datatype = m_datatype;
@@ -782,7 +807,7 @@ bool oa::Parser::onPath()
 {
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onPath: read error");
     }
     // EWPXYRDL
     if (info & 1) { // L
@@ -830,7 +855,7 @@ bool oa::Parser::onPath()
 
     if ((info >> 5) & 1) { // P
         if(!onPointList(false)) {
-            return false;
+            throw std::domain_error("onPath: onPointList");
         }
         m_modalVariableSetStatus.m_d.pathPointList = 1;
     }
@@ -840,7 +865,7 @@ bool oa::Parser::onPath()
             & m_modalVariableSetStatus.m_d.pathStartExtention
             & m_modalVariableSetStatus.m_d.pathEndExtention
             & m_modalVariableSetStatus.m_d.pathPointList)) {
-        return false;
+        throw std::domain_error("onPath: required modal variables not set");
     }
 
     if ((info >> 4) & 1) { // X
@@ -884,7 +909,7 @@ bool oa::Parser::onTrapezoid(int type)
     Trapezoid trapezoid;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onTrapezoid: read error");
     }
     // 0WHXYRDL
     if (info & 1) { // L
@@ -907,7 +932,7 @@ bool oa::Parser::onTrapezoid(int type)
             & m_modalVariableSetStatus.m_d.datatype
             & m_modalVariableSetStatus.m_d.geometryH
             & m_modalVariableSetStatus.m_d.geometryW)) {
-        return false;
+        throw std::domain_error("onTrapezoid: required modal variables not set");
     }
     trapezoid.m_layer = m_layer;
     trapezoid.m_datatype = m_datatype;
@@ -968,7 +993,7 @@ bool oa::Parser::onCTrapezoid()
     CTrapezoid ctrapezoid;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onCTrapezoid: read error");
     }
     // TWHXYRDL
     if (info & 1) { // L
@@ -980,8 +1005,8 @@ bool oa::Parser::onCTrapezoid()
         m_modalVariableSetStatus.m_d.datatype = 1;
     }
     if ((info >> 7) & 1) { // T
-        ctrapezoid.m_type = onUnsigned();
-
+        m_ctrapezoidType = onUnsigned();
+        m_modalVariableSetStatus.m_d.ctrapezoidType = 1;
     }
     if ((info >> 6) & 1) { // W
         m_geometryW = onUnsigned();
@@ -993,12 +1018,14 @@ bool oa::Parser::onCTrapezoid()
     }
     if (!(m_modalVariableSetStatus.m_d.layer
             & m_modalVariableSetStatus.m_d.datatype
+            & m_modalVariableSetStatus.m_d.ctrapezoidType
             & m_modalVariableSetStatus.m_d.geometryH
             & m_modalVariableSetStatus.m_d.geometryW)) {
-        return false;
+        throw std::domain_error("onCTrapezoid: required modal variables not set");
     }
     ctrapezoid.m_layer = m_layer;
     ctrapezoid.m_datatype = m_datatype;
+    ctrapezoid.m_type = m_ctrapezoidType;
     ctrapezoid.m_width = m_geometryW;
     ctrapezoid.m_height = m_geometryH;
     if ((info >> 4) & 1) { // X
@@ -1033,7 +1060,7 @@ bool oa::Parser::onCircle()
     Circle circle;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onCircle: read error");
     }
     // 00rXYRDL
     if (info & 1) { // L
@@ -1051,7 +1078,7 @@ bool oa::Parser::onCircle()
     if (!(m_modalVariableSetStatus.m_d.layer
             & m_modalVariableSetStatus.m_d.datatype
             & m_modalVariableSetStatus.m_d.circleRadius)) {
-        return false;
+        throw std::domain_error("onCircle: required modal variables not set");
     }
     circle.m_layer = m_layer;
     circle.m_datatype = m_datatype;
@@ -1091,13 +1118,13 @@ bool oa::Parser::onProperty(int type)
 {
     if (type == 29) {
         if (!m_modalVariableSetStatus.m_d.lastPropertyName) {
-            return false;
+            throw std::domain_error("onProperty: type 29, but lastPropertyName is not set");
         }
         return true; // m_lastPropertyName
     }
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onProperty: read error");
     }
     // UUUUVCNS
     if ((info >> 2) & 1) { // C
@@ -1106,7 +1133,7 @@ bool oa::Parser::onProperty(int type)
             if (m_layout.m_propNames.find(i) == m_layout.m_propNames.end()) {
                 // TODO Klayout introduces a forward  name table to delay reference
                 // we assume we are in strict mode
-                return false;
+                throw std::domain_error("PropertyName not found");
             }
             m_lastPropertyName = m_layout.m_propNames[i];
         }
@@ -1118,9 +1145,12 @@ bool oa::Parser::onProperty(int type)
     quint32 valueCount = 0;
     if ((info >> 3) & 1) { // V
         if (info >> 4) {
-            return false;
+            throw std::domain_error("onProperty: V=1 but UUUU != 0");
         }
-        return m_modalVariableSetStatus.m_d.lastValueList == 1;
+        if (!m_modalVariableSetStatus.m_d.lastValueList) {
+            throw std::domain_error("onProperty: lastValueList not set");
+        }
+        return true;
     } else {
         quint8 uuuu = info >> 4;
         if (uuuu == 15) {
@@ -1158,7 +1188,7 @@ bool oa::Parser::onProperty(int type)
                 break;
             default:
                 // parse error
-                return false;
+                throw std::domain_error("onProperty: invalid lastValueList kind");
                 break;
             }
             if (kind < 16) {
@@ -1180,8 +1210,7 @@ bool oa::Parser::onXName(int type)
         }
     }
     if ((m_xNameMode == Implicit && type == 31) || (m_xNameMode == Explicit && type == 30)) {
-        qWarning("Both Implicit and Explicit XName!");
-        return false;
+        throw std::domain_error("Both Implicit and Explicit XName!");
     }
 
     XName xname;
@@ -1212,7 +1241,7 @@ bool oa::Parser::onXGeometry()
     XGeometry xgeometry;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
-        return false;
+        throw std::domain_error("onXGeometry: read error");
     }
     // 000XYRDL
     xgeometry.m_attribute = onSigned();
@@ -1262,28 +1291,44 @@ bool oa::Parser::onXGeometry()
     m_currentCell->m_xgeometries.append(xgeometry);
 }
 
-bool oa::Parser::onCBlock() {}
+bool oa::Parser::onCBlock() {
+    quint64 comType = onUnsigned();
+    quint64 uncomByteCount = onUnsigned();
+    quint64 comByteCount = onUnsigned();
+    QVarLengthArray<char, 1024> cblockData(comByteCount);
+    if (m_dataStream->read(cblockData.data(), comByteCount) != comByteCount)
+    {
+        throw std::domain_error("onCBlock: read error");
+    }
+    // TODO handle cblockData
+    return true;
+}
 
 quint64 oa::Parser::onUnsigned() {
     quint64 v = 0;
-    quint64 vm = 1;
+    quint64 p = 1;
     char c = 0;
+    static quint64 threshold = std::numeric_limits <quint64>::max () >> 7;
 
-    do {
+    for (;;) {
         if (m_dataStream->atEnd()) {
-            // Report BAD_STATUS
-            return 0;
+            /*abort();*/
+            throw std::domain_error("Fail atEnd");
         }
         if (m_dataStream->read(&c, 1) != 1) {
-            return 0;
+            throw std::domain_error("fail to read ");
         }
-        if (vm > (std::numeric_limits <quint64>::max () >> 7) && (quint64) (c & 0x7f) > (std::numeric_limits <quint64>::max () / vm)) {
-            // Report BAD_STATUS
+        if (p > threshold &&
+                (quint64) (c & 0x7F) > (std::numeric_limits <quint64>::max () / p)) {
+            throw std::domain_error("onUnsigned: overflow");
+        }
+
+        v += static_cast<quint64> (c & 0x7F) * p;
+        p <<= 7;
+        if (!(c & 0x80)) {
             break;
         }
-        v += static_cast<quint64> (c & 0x7f) * vm;
-        vm <<= 7;
-    } while ((c & 0x80) != 0);
+    };
     return v;
 }
 
@@ -1316,7 +1361,7 @@ double oa::Parser::onReal() {
         float v;
         if(m_dataStream->read((char*) &v, sizeof(float)) != sizeof(float)) {
 
-            return 0.0f;
+            throw std::domain_error("onReal: fail to read float");
         }
         return v;
     }
@@ -1324,13 +1369,12 @@ double oa::Parser::onReal() {
     {
         double v;
         if(m_dataStream->read((char*) &v, sizeof(double)) != sizeof(double)) {
-            return 0.0f;
+            throw std::domain_error("onReal: fail to read double");
         }
         return v;
     }
     default:
-        // TODO report BAD_STATUS
-        return 0.0;
+        throw std::domain_error("onReal: fail to read real");
     }
 }
 
@@ -1358,14 +1402,15 @@ QString oa::Parser::onString(StringType type) {
     if (len > 1024) {
         qWarning("A long string");
     }
-    QVarLengthArray<char, 1024> s(len + 1);
+//     qWarning("onString %d %d", len, m_dataStream->pos());
+    QVarLengthArray<char, 1024> s(len);
     if (m_dataStream->read(s.data(), len) != len)
     {
-        // TODO report BAD_STATUS
-        return QString();
+//         abort();
+        throw std::domain_error("onString: read error");
     }
-    // TODO check type against s
-    return QString(s.constData());
+    qWarning(QString::fromLatin1(s.constData(), len).toStdString().c_str());
+    return QString::fromLatin1(s.constData(), len);
 }
 
 bool oa::Parser::onRepetition() {
@@ -1376,7 +1421,7 @@ bool oa::Parser::onRepetition() {
     switch (type)
     {
     case 0:
-        return !m_repetition.isNull();
+        return m_modalVariableSetStatus.m_d.repetition == 1;
     case 1: {
         m_repetition.reset(new Repetition1(onUnsigned(), onUnsigned(), onUnsigned(), onUnsigned()));
         return true;
@@ -1463,7 +1508,7 @@ bool oa::Parser::onRepetition() {
         return true;
     }
     default:
-        return false;
+        throw std::domain_error("invalid Repetition");
         break;
     }
 }
@@ -1537,7 +1582,7 @@ bool oa::Parser::onPointList(bool isPolygon) {
         break;
     }
     default:
-        return false;
+        throw std::domain_error("invalid PointList");
         break;
     }
     if (isPolygon) {
@@ -1585,3 +1630,4 @@ void oa::Parser::undefineModalVariables()
     m_pointList.clear();
     m_lastValuesList.clear();
 }
+
