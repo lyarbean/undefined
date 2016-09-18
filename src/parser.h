@@ -39,8 +39,8 @@ public:
     bool open(const QString& filename);
 protected:
     bool parse();
-    bool beginStart();
-    bool readTableOffsets();
+    void beginStart();
+    void readTableOffsets();
 private:
     enum RecordType {
         PAD = 0,
@@ -79,32 +79,32 @@ private:
         XGEOMETRY = 33,
         CBLOCK = 34
     };
-    bool nextRecord();
+    void nextRecord();
     // Records
-    bool onPad();
-    bool onStart();
-    bool onEnd();
-    bool onCellName(int type); // 3 or 4
-    bool onTextString(int type); // 5 or 6
-    bool onPropName(int type);
-    bool onPropString(int type);
-    bool onLayerName(int type);
-    bool onCell(int type);
-    bool onXYAbsolute();
-    bool onXYRelative();
-    bool onPlacement(int type);
-    bool onText();
-    bool onRectangle();
-    bool onPolygon();
-    bool onPath();
-    bool onTrapezoid(int type);
-    bool onCTrapezoid();
-    bool onCircle();
-    bool onProperty(int type);
-    bool onXName(int type);
-    bool onXElement();
-    bool onXGeometry();
-    bool onCBlock();
+    void onPad();
+    void onStart();
+    void onEnd();
+    void onCellName(int type); // 3 or 4
+    void onTextString(int type); // 5 or 6
+    void onPropName(int type);
+    void onPropString(int type);
+    void onLayerName(int type);
+    void onCell(int type);
+    void onXYAbsolute();
+    void onXYRelative();
+    void onPlacement(int type);
+    void onText();
+    void onRectangle();
+    void onPolygon();
+    void onPath();
+    void onTrapezoid(int type);
+    void onCTrapezoid();
+    void onCircle();
+    void onProperty(int type);
+    void onXName(int type);
+    void onXElement();
+    void onXGeometry();
+    void onCBlock();
     // Data
     quint64 onUnsigned();
     qint64 onSigned();
@@ -120,8 +120,8 @@ private:
     QString onString(StringType type = A); // TODO Validation
 
     // Composite
-    bool onRepetition();
-    bool onPointList(bool isPolygon);
+    void onRepetition();
+    void onPointList(bool isPolygon);
 
     using IntervalType = QPair<quint64, quint64>;
     IntervalType onInterval();

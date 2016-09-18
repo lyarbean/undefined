@@ -69,9 +69,7 @@ bool oa::Parser::open(const QString& filename) {
 
 bool oa::Parser::parse() {
     // Handle START and END first
-    if (!beginStart()) {
-        throw std::domain_error("Fail to parse beginStart");
-    }
+    beginStart();
     // A2-1.1 Any file-level standard properties must appear immediately after the START record in an OASIS file. Use of
     // file-level standard properties is optional—OASIS processors may omit/ignore any or all of them.
 
@@ -85,12 +83,11 @@ bool oa::Parser::parse() {
         case CELL:
         case CELLX:
         case CELLNAME ... LAYERNAMEX:
-            if (!nextRecord()) {
-                throw std::domain_error("parse: Read error");
-            }
+            nextRecord();
             break;
         case END:
             if (m_dataStream->pos() != m_dataStream->size() - 256) {
+                qWarning("parse %d / %d", m_dataStream->pos(), m_dataStream->size());
                 throw std::domain_error("parse End Read error");
             }
             return true;
@@ -98,85 +95,106 @@ bool oa::Parser::parse() {
             throw std::domain_error("parse: START again? Parse Error");
             break;
         default:
-            throw std::domain_error("parse: Parse Error");
+            throw std::domain_error(QString("parse: Parse Error:%1").arg(type).toStdString());
             break;
         }
     }
 }
 
-bool oa::Parser::beginStart() {
+void oa::Parser::beginStart() {
     quint8 type = onUnsigned();
     if (type != 1) {
         throw std::domain_error("beginStart: No START?");
     }
-    return onStart();
+    onStart();
 }
 
 
-bool oa::Parser::nextRecord()
+void oa::Parser::nextRecord()
 {
     quint64 type = onUnsigned();
     switch (type) {
     case PAD:
-        return onPad();
+        onPad();
     case CELLNAME:
     case CELLNAMEX:
-        return onCellName(type);
+        onCellName(type);
+        break;
     case TEXTSTRING:
     case TEXTSTRINGX:
-        return onTextString(type);
+        onTextString(type);
+        break;
     case PROPNAME:
     case PROPNAMEX:
-        return onPropName(type);
+        onPropName(type);
+        break;
     case PROPSTRING:
     case PROPSTRINGX:
-        return onPropString(type);
+        onPropString(type);
+        break;
     case LAYERNAME:
     case LAYERNAMEX:
-        return onLayerName(type);
+        onLayerName(type);
+        break;
     case CELL:
     case CELLX:
-        return onCell(type);
+        onCell(type);
+        break;
     case XYABSOLUTE:
-        return onXYAbsolute();
+        onXYAbsolute();
+        break;
     case XYRELATIVE:
-        return onXYRelative();
+        onXYRelative();
+        break;
     case PLACEMENT:
     case PLACEMENTX:
-        return onPlacement(type);
+        onPlacement(type);
+        break;
     case TEXT:
-        return onText();
+        onText();
+        break;
     case RECTANGLE:
-        return onRectangle();
+        onRectangle();
+        break;
     case POLYGON:
-        return onPolygon();
+        onPolygon();
+        break;
     case PATH:
-        return onPath();
+        onPath();
+        break;
     case TRAPEZOID:
     case TRAPEZOIDX:
     case TRAPEZOIDY:
-        return onTrapezoid(type);
+        onTrapezoid(type);
+        break;
     case CTRAPEZOID:
-        return onCTrapezoid();
+        onCTrapezoid();
+        break;
     case CIRCLE:
-        return onCircle();
+        onCircle();
+        break;
     case PROPERTY:
     case PROPERTYX:
-        return onProperty(type);
+        onProperty(type);
+        break;
     case XNAME:
     case XNAMEX:
-        return onXName(type);
+        onXName(type);
+        break;
     case XELEMENT:
-        return onXElement();
+        onXElement();
+        break;
     case XGEOMETRY:
-        return onXGeometry();
+        onXGeometry();
+        break;
     case CBLOCK:
-        return onCBlock();
+        onCBlock();
+        break;
     default:
         throw std::domain_error(QString("nextRecord: unintended type:%1").arg(type).toStdString());
     }
 }
-bool oa::Parser::onStart()
+void oa::Parser::onStart()
 {
     QString version = onString(N);
     if (version != "1.0") {
@@ -195,19 +213,14 @@ bool oa::Parser::onStart()
         currentPos = m_dataStream->pos();
         qint64 endOffset = m_dataStream->size() - 255; // END at -256
         m_dataStream->seek(endOffset);
-        if (!onEnd()) {
-            throw std::domain_error("fail to parse onEnd");
-        }
+        onEnd();
     }
-    if (!readTableOffsets()) {
-        throw std::domain_error("fail to parse readTableOffsets");
-    }
+    readTableOffsets();
     m_dataStream->seek(currentPos);
-    return true;
 }
 
 
-bool oa::Parser:: readTableOffsets() {
+void oa::Parser:: readTableOffsets() {
     quint32 cellnameOffset, textstringOffset, propnameOffset, propstringOffset, layernameOffset, xnameOffset;
     cellnameOffset = m_tableOffsets.at(1);
     textstringOffset = m_tableOffsets.at(3);
@@ -223,9 +236,7 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 3 || type == 4) {
                 m_dataStream->read(1);
-                if(!onCellName(type)) {
-                    throw std::domain_error("readTableOffsets: onCellName");
-                }
+                onCellName(type);
             } else {
                 break;
             }
@@ -238,9 +249,7 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 5 || type == 6) {
                 m_dataStream->read(1);
-                if(!onTextString(type)) {
-                    throw std::domain_error("readTableOffsets: onTextString");
-                }
+                onTextString(type);
             } else {
                 break;
             }
@@ -253,9 +262,7 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 7 || type == 8) {
                 m_dataStream->read(1);
-                if(!onPropName(type)) {
-                    throw std::domain_error("readTableOffsets: onPropName");
-                }
+                onPropName(type);
             } else {
                 break;
             }
@@ -268,9 +275,7 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 9 || type == 10) {
                 m_dataStream->read(1);
-                if(!onPropString(type)) {
-                    throw std::domain_error("readTableOffsets: onPropString");
-                }
+                onPropString(type);
             } else {
                 break;
             }
@@ -283,9 +288,7 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 11 || type == 12) {
                 m_dataStream->read(1);
-                if(!onLayerName(type)) {
-                    throw std::domain_error("readTableOffsets: onLayerName");
-                }
+                onLayerName(type);
             } else {
                 break;
             }
@@ -298,30 +301,26 @@ bool oa::Parser:: readTableOffsets() {
             quint8 type = m_dataStream->peek(1)[0];
             if (type == 30 || type == 31) {
                 m_dataStream->read(1);
-                if(!onXName(type)) {
-                    throw std::domain_error("readTableOffsets: onXName");
-                }
+                onXName(type);
             } else {
                 break;
             }
         }
     }
-    return true;
 }
 
-bool oa::Parser::onPad() {
-    return true;
+void oa::Parser::onPad() {
+    return;
 }
 
 // TODO CRC
-bool oa::Parser::onEnd()
+void oa::Parser::onEnd()
 {
     if (m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
             m_tableOffsets << onUnsigned();
         }
     }
-    return true;
     // TODO validation
     // padding string
 //     int size = 255 - (m_offsetFlag ? 12 : 0);
@@ -329,7 +328,7 @@ bool oa::Parser::onEnd()
 //     return m_dataStream->read(endBytes, size) == size;
 }
 
-bool oa::Parser::onCellName(int type)
+void oa::Parser::onCellName(int type)
 {
     QString name = onString(N);
     if (m_cellNameMode == Default) {
@@ -354,7 +353,7 @@ bool oa::Parser::onCellName(int type)
     auto namedCell = m_layout.m_cells.find(reference);
     if (namedCell != m_layout.m_cells.end()) {
         if (!namedCell->m_name.isEmpty()) {
-            throw std::domain_error("Duplicated CELLNAME reference-number");
+//             throw std::domain_error("Duplicated CELLNAME wreference-number");
         }
     }
     // update or create
@@ -364,10 +363,9 @@ bool oa::Parser::onCellName(int type)
     // an OASIS file. Use of cell-level standard properties is optional—OASIS processors may omit/ignore any or all of
     // them.
     // TODO try to handle cell properties immediately if we care
-    return true;
 }
 
-bool oa::Parser::onTextString(int type)
+void oa::Parser::onTextString(int type)
 {
     QString name = onString(N);
     if (m_textStringMode == Default) {
@@ -393,10 +391,9 @@ bool oa::Parser::onTextString(int type)
         throw std::domain_error("Duplicated TEXTSTRING reference-number");
     }
     m_layout.m_textStrings.insert(reference, name);
-    return true;
 }
 
-bool oa::Parser::onPropName(int type)
+void oa::Parser::onPropName(int type)
 {
     QString name = onString(N);
     if (m_propNameMode == Default) {
@@ -421,10 +418,9 @@ bool oa::Parser::onPropName(int type)
         throw std::domain_error("Duplicated PROPNAME reference-number");
     }
     m_layout.m_propNames.insert(reference, name);
-    return true;
 }
 
-bool oa::Parser::onPropString(int type)
+void oa::Parser::onPropString(int type)
 {
     QString name = onString(N);
     if (m_propStringMode == Default) {
@@ -449,23 +445,22 @@ bool oa::Parser::onPropString(int type)
         throw std::domain_error("Duplicated PROPSTRING reference-number");
     }
     m_layout.m_propStrings.insert(reference, name);
-    return true;
 }
 
-bool oa::Parser::onLayerName(int type)
+void oa::Parser::onLayerName(int type)
 {
     Q_UNUSED(type);
 //     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
     QString name = onString(N);
 //     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
-    IntervalType interval = onInterval();
-    // TODO Merge
+    IntervalType layerInterval = onInterval();
+    IntervalType dataInterval = onInterval();
+    // FIXME add  layers:dataypes
     QVector<QPair<quint32, quint32>>& dataLayers = m_layout.m_layerNames[name];
-    dataLayers.append(interval);
-    return true;
+    dataLayers.append(layerInterval);
 }
 
-bool oa::Parser::onCell(int type)
+void oa::Parser::onCell(int type)
 {
     QSharedPointer<Cell> cell(new Cell);
     m_currentCell = cell;
@@ -498,34 +493,29 @@ bool oa::Parser::onCell(int type)
         case XYABSOLUTE ... PROPERTYX:
         case XELEMENT:
         case XGEOMETRY:
-            if (!nextRecord()) {
-                throw std::domain_error("onCell: parse error");
-            }
+            nextRecord();
             break;
         case START: // START again
             throw std::domain_error("onCell: START again");
             break;
         default:
-            return true; // Handle on parse()
+            return; // Handle on parse()
             break;
         }
     }
-    return true;
 }
 
-bool oa::Parser::onXYAbsolute()
+void oa::Parser::onXYAbsolute()
 {
     m_isXYRelative = false;
-    return true;
 }
 
-bool oa::Parser::onXYRelative()
+void oa::Parser::onXYRelative()
 {
     m_isXYRelative = true;
-    return true;
 }
 
-bool oa::Parser::onPlacement(int type)
+void oa::Parser::onPlacement(int type)
 {
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -537,20 +527,24 @@ bool oa::Parser::onPlacement(int type)
         if ((info >> 6) & 1) { // N
             m_placementCell = onUnsigned();
             if (m_layout.m_cells.find(m_placementCell) == m_layout.m_cells.end()) {
-                // FIXME CellName not read yet
-//                 return false;
+                // FIXME t8.7
+                throw std::domain_error("CELLNAME is not read yet");
             }
             placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
+            m_modalVariableSetStatus.m_d.placementCell = 1;
         } else {
             placement.m_cellName = onString(N);
+            auto c = m_layout.m_cellNameToReference.find(placement.m_cellName);
+            if (c != m_layout.m_cellNameToReference.end()) {
+                m_modalVariableSetStatus.m_d.placementCell = 1;
+                m_placementCell = *c;
+            }
         }
-        m_modalVariableSetStatus.m_d.placementCell = 1;
     } else if (!m_modalVariableSetStatus.m_d.placementCell) {
         throw std::domain_error("Modal variable placementCell is undefined");
     }  else {
         placement.m_cellName = m_layout.m_cells[m_placementCell].m_name;
     }
-
     if (type == 18) {
         if ((info >> 2) & 1) { // M
             placement.m_manification = onReal();
@@ -588,18 +582,15 @@ bool oa::Parser::onPlacement(int type)
     placement.m_y = m_placementY;
 
     if ((info >> 3) & 1) { // R
-        if(!onRepetition()) {
-             throw std::domain_error("onPlacement: no Repetition");
-        }
+        onRepetition();
         placement.m_repetition = m_repetition;
     }
     placement.m_flip = (info & 0b1); // F
     m_currentCell->m_placements.append(placement);
     // TODO onProperty
-    return true;
 }
 
-bool oa::Parser::onText()
+void oa::Parser::onText()
 {
     Text text;
     quint8 info = 0;
@@ -620,7 +611,6 @@ bool oa::Parser::onText()
         else {
             m_textString = onString(N);
         }
-        qWarning(m_textString.toStdString().c_str());
         m_modalVariableSetStatus.m_d.textString = 1;
     }
 
@@ -664,16 +654,13 @@ bool oa::Parser::onText()
     text.m_y = m_textY;
 
     if ((info >> 2) & 1) { // R
-        if (!onRepetition()) {
-            throw std::domain_error("No Repetition");
-        }
+        onRepetition();
         text.m_repetition = m_repetition;
     }
     m_currentCell->m_texts.append(text);
-    return true;
 }
 
-bool oa::Parser::onRectangle()
+void oa::Parser::onRectangle()
 {
     Rectangle rectangle;
     quint8 info = 0;
@@ -732,16 +719,13 @@ bool oa::Parser::onRectangle()
     rectangle.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         rectangle.m_repetition = m_repetition;
     }
     m_currentCell->m_rectangles.append(rectangle);
-    return true;
 }
 
-bool oa::Parser::onPolygon()
+void oa::Parser::onPolygon()
 {
     Polygon polygon;
     quint8 info = 0;
@@ -760,9 +744,7 @@ bool oa::Parser::onPolygon()
     }
 
     if ((info >> 5) & 1) { // P
-        if(!onPointList(true)) {
-            return false;
-        }
+        onPointList(true);
         m_modalVariableSetStatus.m_d.polygonPointList = 1;
     }
     if (!(m_modalVariableSetStatus.m_d.layer & m_modalVariableSetStatus.m_d.datatype
@@ -793,17 +775,14 @@ bool oa::Parser::onPolygon()
     polygon.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         polygon.m_repetition = m_repetition;
     }
     m_currentCell->m_polygons.append(polygon);
-    return true;
 }
 
 
-bool oa::Parser::onPath()
+void oa::Parser::onPath()
 {
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -854,9 +833,7 @@ bool oa::Parser::onPath()
 
 
     if ((info >> 5) & 1) { // P
-        if(!onPointList(false)) {
-            throw std::domain_error("onPath: onPointList");
-        }
+        onPointList(false);
         m_modalVariableSetStatus.m_d.pathPointList = 1;
     }
     if (!(m_modalVariableSetStatus.m_d.layer
@@ -895,16 +872,13 @@ bool oa::Parser::onPath()
     path.m_x = m_geometryX;
     path.m_y = m_geometryY;
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         path.m_repetition = m_repetition;
     }
     m_currentCell->m_paths.append(path);
-    return true;
 }
 
-bool oa::Parser::onTrapezoid(int type)
+void oa::Parser::onTrapezoid(int type)
 {
     Trapezoid trapezoid;
     quint8 info = 0;
@@ -980,15 +954,13 @@ bool oa::Parser::onTrapezoid(int type)
     trapezoid.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         trapezoid.m_repetition = m_repetition;
     }
     m_currentCell->m_trapezoids.append(trapezoid);
 }
 
-bool oa::Parser::onCTrapezoid()
+void oa::Parser::onCTrapezoid()
 {
     CTrapezoid ctrapezoid;
     quint8 info = 0;
@@ -1047,15 +1019,13 @@ bool oa::Parser::onCTrapezoid()
     }
     ctrapezoid.m_y = m_geometryY;
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         ctrapezoid.m_repetition = m_repetition;
     }
     m_currentCell->m_ctrapezoids.append(ctrapezoid);
 }
 
-bool oa::Parser::onCircle()
+void oa::Parser::onCircle()
 {
     Circle circle;
     quint8 info = 0;
@@ -1104,9 +1074,7 @@ bool oa::Parser::onCircle()
     circle.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         circle.m_repetition = m_repetition;
     }
     m_currentCell->m_circles.append(circle);
@@ -1114,13 +1082,13 @@ bool oa::Parser::onCircle()
 
 // TODO How to associate properties to elements
 // If no m_currentCell set, then this property applies to the whole layout
-bool oa::Parser::onProperty(int type)
+void oa::Parser::onProperty(int type)
 {
     if (type == 29) {
         if (!m_modalVariableSetStatus.m_d.lastPropertyName) {
             throw std::domain_error("onProperty: type 29, but lastPropertyName is not set");
         }
-        return true; // m_lastPropertyName
+        return; // m_lastPropertyName
     }
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -1150,7 +1118,6 @@ bool oa::Parser::onProperty(int type)
         if (!m_modalVariableSetStatus.m_d.lastValueList) {
             throw std::domain_error("onProperty: lastValueList not set");
         }
-        return true;
     } else {
         quint8 uuuu = info >> 4;
         if (uuuu == 15) {
@@ -1162,7 +1129,7 @@ bool oa::Parser::onProperty(int type)
         for (auto i = 0; i < valueCount; ++i) {
             quint8 kind = 0;
             if (m_dataStream->read((char*)&kind, 1) != 1) {
-                return false;
+                throw std::domain_error("onProperty: read error");
             }
             switch (kind) {
             case 0 ... 7:
@@ -1195,11 +1162,10 @@ bool oa::Parser::onProperty(int type)
                 m_modalVariableSetStatus.m_d.lastValueList = 1;
             }
         }
-        return true;
     }
 }
 
-bool oa::Parser::onXName(int type)
+void oa::Parser::onXName(int type)
 {
     if (m_xNameMode == Default) {
         if (type == 30) {
@@ -1227,7 +1193,7 @@ bool oa::Parser::onXName(int type)
 
 }
 
-bool oa::Parser::onXElement()
+void oa::Parser::onXElement()
 {
     // Assert state Element
     XELement xelement;
@@ -1236,7 +1202,7 @@ bool oa::Parser::onXElement()
     m_currentCell->m_xelements.push_back(xelement);
 }
 
-bool oa::Parser::onXGeometry()
+void oa::Parser::onXGeometry()
 {
     XGeometry xgeometry;
     quint8 info = 0;
@@ -1256,7 +1222,7 @@ bool oa::Parser::onXGeometry()
     }
     if (!(m_modalVariableSetStatus.m_d.layer
             & m_modalVariableSetStatus.m_d.datatype)) {
-        return false;
+        throw std::domain_error("onXGeometry: required modal variables not set");
     }
     xgeometry.m_layer = m_layer;
     xgeometry.m_datatype = m_datatype;
@@ -1283,15 +1249,13 @@ bool oa::Parser::onXGeometry()
     xgeometry.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
-        if(!onRepetition()) {
-            return false;
-        }
+        onRepetition();
         xgeometry.m_repetition = m_repetition;
     }
     m_currentCell->m_xgeometries.append(xgeometry);
 }
 
-bool oa::Parser::onCBlock() {
+void oa::Parser::onCBlock() {
     quint64 comType = onUnsigned();
     quint64 uncomByteCount = onUnsigned();
     quint64 comByteCount = onUnsigned();
@@ -1301,7 +1265,6 @@ bool oa::Parser::onCBlock() {
         throw std::domain_error("onCBlock: read error");
     }
     // TODO handle cblockData
-    return true;
 }
 
 quint64 oa::Parser::onUnsigned() {
@@ -1409,11 +1372,12 @@ QString oa::Parser::onString(StringType type) {
 //         abort();
         throw std::domain_error("onString: read error");
     }
+    qWarning("onString");
     qWarning(QString::fromLatin1(s.constData(), len).toStdString().c_str());
     return QString::fromLatin1(s.constData(), len);
 }
 
-bool oa::Parser::onRepetition() {
+void oa::Parser::onRepetition() {
     quint8 type = onUnsigned();
     if (type && type < 12) {
         m_modalVariableSetStatus.m_d.repetition = 1;
@@ -1421,18 +1385,21 @@ bool oa::Parser::onRepetition() {
     switch (type)
     {
     case 0:
-        return m_modalVariableSetStatus.m_d.repetition == 1;
+        if (!m_modalVariableSetStatus.m_d.repetition) {
+            throw std::domain_error("invalid Repetition");
+        }
+        break;
     case 1: {
         m_repetition.reset(new Repetition1(onUnsigned(), onUnsigned(), onUnsigned(), onUnsigned()));
-        return true;
+        break;
     }
     case 2: {
         m_repetition.reset(new Repetition2(onUnsigned(), onUnsigned()));
-        return true;
+        break;
     }
     case 3: {
         m_repetition.reset(new Repetition3(onUnsigned(), onUnsigned()));
-        return true;
+        break;
     }
     case 4: {
         quint64 dx = onUnsigned(); // n - 2
@@ -1441,7 +1408,6 @@ bool oa::Parser::onRepetition() {
             sxz << onUnsigned();
         }
         m_repetition.reset(new Repetition4(dx, sxz));
-        return true;
     }
     case 5: {
         quint64 dx = onUnsigned(); // n - 2
@@ -1451,7 +1417,7 @@ bool oa::Parser::onRepetition() {
             sxz << onUnsigned();
         }
         m_repetition.reset(new Repetition5(dx, g, sxz));
-        return true;
+        break;
     }
     case 6: {
         quint64 dy = onUnsigned(); // n - 2
@@ -1460,7 +1426,7 @@ bool oa::Parser::onRepetition() {
             syz << onUnsigned();
         }
         m_repetition.reset(new Repetition6(dy, syz));
-        return true;
+        break;
     }
     case 7: {
         quint64 dy = onUnsigned(); // n - 2
@@ -1470,7 +1436,7 @@ bool oa::Parser::onRepetition() {
             syz << onUnsigned();
         }
         m_repetition.reset(new Repetition7(dy, g, syz));
-        return true;
+        break;
     }
     case 8: {
         quint64 dn = onUnsigned();
@@ -1478,13 +1444,13 @@ bool oa::Parser::onRepetition() {
         DeltaG pn = onDeltaG();
         DeltaG pm = onDeltaG();
         m_repetition.reset(new Repetition8(dn, dm, pn.value, pm.value));
-        return true;
+        break;
     }
     case 9: {
         quint64 d = onUnsigned();
         DeltaG p = onDeltaG();
         m_repetition.reset(new Repetition9(d, p.value));
-        return true;
+        break;
     }
     case 10: {
         quint64 d = onUnsigned(); // p - 2
@@ -1494,7 +1460,7 @@ bool oa::Parser::onRepetition() {
             pz << p.value;
         }
         m_repetition.reset(new Repetition10(d, pz));
-        return true;
+        break;
     }
     case 11: {
         quint64 d = onUnsigned(); // p - 2
@@ -1505,7 +1471,7 @@ bool oa::Parser::onRepetition() {
             pz << p.value;
         }
         m_repetition.reset(new Repetition11(d, g, pz));
-        return true;
+        break;
     }
     default:
         throw std::domain_error("invalid Repetition");
@@ -1513,7 +1479,7 @@ bool oa::Parser::onRepetition() {
     }
 }
 
-bool oa::Parser::onPointList(bool isPolygon) {
+void oa::Parser::onPointList(bool isPolygon) {
     quint8 type = onUnsigned();
     quint64 count = onUnsigned();
     QSharedPointer<PointList> pointList (new PointList);
@@ -1592,8 +1558,6 @@ bool oa::Parser::onPointList(bool isPolygon) {
         m_pointList = pointList;
         m_modalVariableSetStatus.m_d.pathPointList = 1;
     }
-
-    return true;
 }
 
 oa::Parser::IntervalType oa::Parser::onInterval() {
@@ -1609,8 +1573,12 @@ oa::Parser::IntervalType oa::Parser::onInterval() {
         quint64 b = onUnsigned();
         return IntervalType {b, b};
     }
-    case 4:
+    case 4: {
         return IntervalType {onUnsigned(), onUnsigned()};
+    }
+    default:
+        throw std::domain_error("invalid Interval");
+        break;
     }
 }
 
