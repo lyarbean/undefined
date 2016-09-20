@@ -130,6 +130,9 @@ private:
     Layout& m_layout;
     QScopedPointer<QFile> m_dataStream;
     QSharedPointer<Cell> m_currentCell;
+    QMap<qint64, QString> m_unresolvedCellName;
+    QMap<qint64, QString> m_unresolvedPropName;
+    QMap<qint64, QString> m_unresolvedTextString;
     bool m_offsetFlag;
     enum Mode {
         Default = 0,
@@ -155,7 +158,7 @@ private:
     QSharedPointer<Repetition> m_repetition;
     QSharedPointer<PointList> m_polygonPointList;
     QSharedPointer<PointList> m_pointList;
-    qint64 m_placementCell; // Cell Reference
+    QString m_placementCell;
     quint32 m_layer, m_datatype;
     quint32 m_textLayer, m_textType;
     qint64 m_placementX;
