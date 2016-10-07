@@ -21,7 +21,7 @@
  */
 
 #include "parser.h"
-
+#include <cmath>
 #include <QDataStream>
 #include <QFile>
 #include <QUuid>
@@ -61,10 +61,12 @@ bool oa::Parser::open(const QString& filename) {
 
         }
         r = parse();
+        m_layout.put();
     } catch (std::exception& e) {
-        qWarning(e.what());
+        qDebug () << e.what();
     }
     m_dataStream.reset();
+
     return r;
 }
 
@@ -85,9 +87,9 @@ bool oa::Parser::parse() {
         case CELLNAME ... LAYERNAMEX:
             nextRecord();
             break;
-        case END:
+        case END: {
             if (m_dataStream->pos() != m_dataStream->size() - 256) {
-                qWarning("parse %d / %d", m_dataStream->pos(), m_dataStream->size());
+                qWarning("parse %lld / %lld", m_dataStream->pos(), m_dataStream->size());
                 throw std::domain_error("parse End Read error");
             }
             if (!m_unresolvedCellName.isEmpty()) {
@@ -105,6 +107,7 @@ bool oa::Parser::parse() {
                 }
             }
             return true;
+        }
         case START: // START again
             throw std::domain_error("parse: START again? Parse Error");
             break;
@@ -113,6 +116,7 @@ bool oa::Parser::parse() {
             break;
         }
     }
+    return false; // No END read
 }
 
 void oa::Parser::beginStart() {
@@ -249,7 +253,7 @@ void oa::Parser:: readTableOffsets() {
         m_dataStream->seek(cellnameOffset);
         while (true) {
             quint8 type = m_dataStream->peek(1)[0];
-            if (type == 3 || type == 4) {
+            if (type == RecordType::CELLNAME || type == RecordType::CELLNAMEX) {
                 m_dataStream->read(1);
                 onCellName(type);
             } else {
@@ -331,22 +335,42 @@ void oa::Parser::onPad() {
 // TODO CRC
 void oa::Parser::onEnd()
 {
-    qInfo("onEnd");
+    //qInfo("onEnd");
     if (m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
             m_tableOffsets << onUnsigned();
         }
     }
     // TODO validation
-    // padding string
-//     int size = 255 - (m_offsetFlag ? 12 : 0);
-//     char endBytes[256];
-//     return m_dataStream->read(endBytes, size) == size;
+    QString padding = onString(B);
+    quint64 scheme = onUnsigned();
+    switch (scheme) {
+    case 0:
+        break;
+    case 1: {
+        char endBytes[4];
+        if (m_dataStream->read(endBytes, 4) != 4) {
+            throw std::domain_error("Read signature error");
+        }
+        // do crc32 validation
+        break;
+    }
+    case 2: {
+        char endBytes[4];
+        if (m_dataStream->read(endBytes, 4) != 4) {
+            throw std::domain_error("Read signature error");
+        }
+        // do checksum32 validation
+        break;
+    }
+    default:
+        throw std::domain_error("invalid scheme type");
+    }
 }
 
 void oa::Parser::onCellName(int type)
 {
-    qInfo("onCellName");
+    //qInfo("onCellName");
     QString name = onString(N);
     if (m_cellNameMode == Default) {
         if (type == 3) {
@@ -376,14 +400,14 @@ void oa::Parser::onCellName(int type)
     // update or create
     m_layout.m_cells[reference].m_name = name;
     m_layout.m_cellNameToReference[name] = reference;
-     if (m_unresolvedCellName.find(reference) != m_unresolvedCellName.end()) {
+    if (m_unresolvedCellName.find(reference) != m_unresolvedCellName.end()) {
         QString unresolved = m_unresolvedCellName[reference];
         m_unresolvedCellName.remove(reference);
         for (auto& namedCell : m_layout.m_cells) {
-                if (namedCell.m_name == unresolved) {
-                    namedCell.m_name = name;
-                }
-         }
+            if (namedCell.m_name == unresolved) {
+                namedCell.m_name = name;
+            }
+        }
         for (auto& namedCell : m_layout.m_cells) {
             QVector<Placement>& placement = namedCell.m_cell->m_placements;
             for (auto& p: placement) {
@@ -408,7 +432,7 @@ void oa::Parser::onCellName(int type)
 
 void oa::Parser::onTextString(int type)
 {
-    qInfo("onTextString");
+    //qInfo("onTextString");
     QString name = onString(N);
     if (m_textStringMode == Default) {
         if (type == 5) {
@@ -452,7 +476,7 @@ void oa::Parser::onTextString(int type)
 
 void oa::Parser::onPropName(int type)
 {
-    qInfo("onPropName");
+    //qInfo("onPropName");
     QString name = onString(N);
     if (m_propNameMode == Default) {
         if (type == 7) {
@@ -489,7 +513,7 @@ void oa::Parser::onPropName(int type)
 
 void oa::Parser::onPropString(int type)
 {
-    qInfo("onPropString");
+    //qInfo("onPropString");
     QString name = onString(B);
     if (m_propStringMode == Default) {
         if (type == 9) {
@@ -517,21 +541,22 @@ void oa::Parser::onPropString(int type)
 
 void oa::Parser::onLayerName(int type)
 {
-    qInfo("onLayerName");
-    Q_UNUSED(type);
-//     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
+    //qInfo("onLayerName");
     QString name = onString(N);
-//     qWarning("onLayerName %d %d", m_dataStream->pos(), m_dataStream->size());
     IntervalType layerInterval = onInterval();
-    IntervalType dataInterval = onInterval();
-    // FIXME add  layers:dataypes
-    QVector<QPair<quint32, quint32>>& dataLayers = m_layout.m_layerNames[name];
-    dataLayers.append(layerInterval);
+    IntervalType datatypeInterval = onInterval();
+    if (type == LAYERNAME) {
+        QVector<QPair<IntervalType, IntervalType>>& layerName = m_layout.m_layerDatatypeNames[name];
+        layerName.append(QPair<IntervalType, IntervalType>(layerInterval, datatypeInterval));
+    } else { // LAYERNAMEX
+        QVector<QPair<IntervalType, IntervalType>>& layerName = m_layout.m_textLayerDatatypeNames[name];
+        layerName.append(QPair<IntervalType, IntervalType>(layerInterval, datatypeInterval));
+    }
 }
 
 void oa::Parser::onCell(int type)
 {
-    qInfo("onCell");
+    //qInfo("onCell");
     QSharedPointer<Cell> cell(new Cell);
     m_currentCell = cell;
     if (type == 13) {
@@ -556,7 +581,10 @@ void oa::Parser::onCell(int type)
     // reset modal variables
     undefineModalVariables();
     while (!m_dataStream->atEnd()) {
-        quint8 type = m_dataStream->peek(1)[0];
+        quint8 type = 0;
+        if (m_dataStream->peek((char*)&type, sizeof(type)) != sizeof(type)) {
+            throw std::domain_error("fail to peek type");
+        }
         switch(type) {
         case CBLOCK:
         case PAD:
@@ -577,19 +605,19 @@ void oa::Parser::onCell(int type)
 
 void oa::Parser::onXYAbsolute()
 {
-    qInfo("onXYAbsolute");
+    //qInfo("onXYAbsolute");
     m_isXYRelative = false;
 }
 
 void oa::Parser::onXYRelative()
 {
-    qInfo("onXYRelative");
+    //qInfo("onXYRelative");
     m_isXYRelative = true;
 }
 
 void oa::Parser::onPlacement(int type)
 {
-    qInfo("onPlacement");
+    //qInfo("onPlacement");
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
         throw std::domain_error("onPlacement: read error");
@@ -632,8 +660,16 @@ void oa::Parser::onPlacement(int type)
         else {
             placement.m_angle = 0.0;
         }
+        if (placement.m_manification <= 0) {
+            throw std::domain_error("onPlacement: Manification is not positive");
+        }
+        if (std::isnan(placement.m_manification) ||  std::isinf(placement.m_manification)) {
+            throw std::domain_error("onPlacement: Manification is out of range");
+        }
+        if (std::isnan(placement.m_angle) ||  std::isinf(placement.m_angle)) {
+            throw std::domain_error("onPlacement: Angle is out of range");
+        }
     }
-
     if ((info >> 5) & 1) { // X
         qint64 x = onSigned();
         if (m_isXYRelative) {
@@ -666,7 +702,7 @@ void oa::Parser::onPlacement(int type)
 
 void oa::Parser::onText()
 {
-    qInfo("onText");
+    //qInfo("onText");
     Text text;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -675,8 +711,6 @@ void oa::Parser::onText()
     // 0CNXYRTL
     if (info >> 6) { // C
         if ((info >> 5) & 1) { // N
-            // t3.4.oas
-            // FIXME could be ;empty now?
             quint32 reference = onUnsigned();
             if (m_layout.m_textStrings.find(reference) == m_layout.m_textStrings.end()) {
                 if (m_unresolvedTextString.find(reference) == m_unresolvedTextString.end()) {
@@ -740,7 +774,7 @@ void oa::Parser::onText()
 
 void oa::Parser::onRectangle()
 {
-    qInfo("onRectangle");
+    //qInfo("onRectangle");
     Rectangle rectangle;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -761,7 +795,7 @@ void oa::Parser::onRectangle()
     }
     if ((info >> 5) & 1) { // H
         if ((info >> 7) & 1) { // S
-            qWarning("A squred rectangle??");
+            throw std::domain_error("onRectangle: S and H are set");
         }
         m_geometryH = onUnsigned();
         m_modalVariableSetStatus.m_d.geometryH = 1;
@@ -806,7 +840,7 @@ void oa::Parser::onRectangle()
 
 void oa::Parser::onPolygon()
 {
-    qInfo("onPolygon");
+    //qInfo("onPolygon");
     Polygon polygon;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -864,7 +898,7 @@ void oa::Parser::onPolygon()
 
 void oa::Parser::onPath()
 {
-    qInfo("onPath");
+    //qInfo("onPath");
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
         throw std::domain_error("onPath: read error");
@@ -1002,17 +1036,18 @@ void oa::Parser::onTrapezoid(int type)
     }
     // FIXME
     // construct points
-    if ((info >> 7) & 1) { // O
-        trapezoid.m_points << DeltaValue {0, qMax<qint64>(a, 0)};
-        trapezoid.m_points << DeltaValue {0, m_geometryH + qMin<qint64>(b, 0)};
-        trapezoid.m_points << DeltaValue {m_geometryW, m_geometryH - qMax<qint64>(b, 0)};
-        trapezoid.m_points << DeltaValue {m_geometryW, -qMin<qint64>(a, 0)};
-    } else {
-        trapezoid.m_points << DeltaValue {qMax<qint64>(a, 0), m_geometryH};
-        trapezoid.m_points << DeltaValue {m_geometryW + qMin<qint64>(b, 0), m_geometryH};
-        trapezoid.m_points << DeltaValue {m_geometryW - qMax<qint64>(b, 0), 0};
-        trapezoid.m_points << DeltaValue {-qMin<qint64>(a, 0), 0};
-    }
+    trapezoid.m_isHorizontal = ((info >> 7) & 1);
+//     if ((info >> 7) & 1) { // O
+//         trapezoid.m_points << DeltaValue {0, qMax<qint64>(a, 0)};
+//         trapezoid.m_points << DeltaValue {0, m_geometryH + qMin<qint64>(b, 0)};
+//         trapezoid.m_points << DeltaValue {m_geometryW, m_geometryH - qMax<qint64>(b, 0)};
+//         trapezoid.m_points << DeltaValue {m_geometryW, -qMin<qint64>(a, 0)};
+//     } else {
+//         trapezoid.m_points << DeltaValue {qMax<qint64>(a, 0), m_geometryH};
+//         trapezoid.m_points << DeltaValue {m_geometryW + qMin<qint64>(b, 0), m_geometryH};
+//         trapezoid.m_points << DeltaValue {m_geometryW - qMax<qint64>(b, 0), 0};
+//         trapezoid.m_points << DeltaValue {-qMin<qint64>(a, 0), 0};
+//     }
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned();
         if (m_isXYRelative) {
@@ -1185,7 +1220,7 @@ void oa::Parser::onCircle()
 // If no m_currentCell set, then this property applies to the whole layout
 void oa::Parser::onProperty(int type)
 {
-    qInfo("onProperty");
+    //qInfo("onProperty");
     if (type == 29) {
         if (!m_modalVariableSetStatus.m_d.lastPropertyName) {
             throw std::domain_error("onProperty: type 29, but lastPropertyName is not set");
@@ -1201,7 +1236,7 @@ void oa::Parser::onProperty(int type)
         if ((info >> 1) & 1) { // N
             quint64 i = onUnsigned();
             if (m_layout.m_propNames.find(i) == m_layout.m_propNames.end()) {
-            // throw std::domain_error("PropertyName not found");
+                // throw std::domain_error("PropertyName not found");
                 if (m_unresolvedPropName.find(i) == m_unresolvedPropName.end()) {
                     m_unresolvedPropName[i] = QUuid::createUuid().toString();
                 }
@@ -1241,7 +1276,6 @@ void oa::Parser::onProperty(int type)
             if (m_dataStream->peek((char*)&kind, 1) != 1) {
                 throw std::domain_error("onProperty: read error");
             }
-            qDebug() << kind << valueCount;
             switch (kind) {
             case 0 ... 7:
                 m_lastValuesList << onReal();
@@ -1289,7 +1323,7 @@ void oa::Parser::onProperty(int type)
 
 void oa::Parser::onXName(int type)
 {
-    qInfo("onXName");
+    //qInfo("onXName");
     if (m_xNameMode == Default) {
         if (type == 30) {
             m_xNameMode = Implicit;
@@ -1318,7 +1352,7 @@ void oa::Parser::onXName(int type)
 
 void oa::Parser::onXElement()
 {
-    qInfo("onXElement");
+    //qInfo("onXElement");
     // Assert state Element
     XELement xelement;
     xelement.m_attribute = onUnsigned();
@@ -1328,7 +1362,7 @@ void oa::Parser::onXElement()
 
 void oa::Parser::onXGeometry()
 {
-    qInfo("onXGeometry");
+    //qInfo("onXGeometry");
     XGeometry xgeometry;
     quint8 info = 0;
     if(m_dataStream->read((char*) &info, 1) != 1) {
@@ -1381,7 +1415,7 @@ void oa::Parser::onXGeometry()
 }
 
 void oa::Parser::onCBlock() {
-    qInfo("onCBlock");
+    //qInfo("onCBlock");
     quint64 comType = onUnsigned();
     quint64 uncomByteCount = onUnsigned();
     quint64 comByteCount = onUnsigned();
@@ -1399,10 +1433,10 @@ quint64 oa::Parser::onUnsigned() {
     uchar c = 0;
     static quint64 threshold = std::numeric_limits <quint64>::max () / 128;
     do {
-//         if (m_dataStream->atEnd()) {
-//             /*abort();*/
-//             throw std::domain_error("Fail atEnd");
-//         }
+        if (m_dataStream->atEnd()) {
+            /*abort();*/
+            throw std::domain_error("Fail atEnd");
+        }
         if (m_dataStream->read((char*)&c, 1) != 1) {
             throw std::domain_error("fail to read ");
         }
@@ -1429,12 +1463,13 @@ double oa::Parser::onReal() {
     switch(k) {
     case 0:
         return onUnsigned();
-    case 1:
-        return -onUnsigned();
+    case 1: {
+        return - double(onUnsigned());
+    }
     case 2:
-        return 1.0 / onUnsigned();
+        return 1.0 / ((double) onUnsigned());
     case 3:
-        return - 1.0 / onUnsigned();
+        return - 1.0 / ((double) onUnsigned());
     case 4:
         return ((double) onUnsigned()) / ((double) onUnsigned());
     case 5:
@@ -1450,6 +1485,7 @@ double oa::Parser::onReal() {
     }
     case 7:
     {
+        // FIXME byteorder?
         double v;
         if(m_dataStream->read((char*) &v, sizeof(double)) != sizeof(double)) {
             throw std::domain_error("onReal: fail to read double");
@@ -1521,30 +1557,30 @@ void oa::Parser::onRepetition() {
     }
     switch (type)
     {
-    case 0:
+    case 0: {
         if (!m_modalVariableSetStatus.m_d.repetition) {
             throw std::domain_error("invalid Repetition");
         }
         break;
+    }
     case 1: {
-        qInfo("onRepetition1");
+        //qInfo("onRepetition1");
         m_repetition.reset(new Repetition1(onUnsigned(), onUnsigned(), onUnsigned(), onUnsigned()));
         break;
     }
     case 2: {
-        qInfo("onRepetition2");
+        //qInfo("onRepetition2");
         m_repetition.reset(new Repetition2(onUnsigned(), onUnsigned()));
         break;
     }
     case 3: {
-        qInfo("onRepetition3");
+        //qInfo("onRepetition3");
         m_repetition.reset(new Repetition3(onUnsigned(), onUnsigned()));
         break;
     }
     case 4: {
-        qInfo("onRepetition4");
+        //qInfo("onRepetition4");
         quint64 dx = onUnsigned();
-        qDebug() << dx;
         QVector<quint32> sxz;
         for (quint64 i = 0; i <= dx; ++i) {
             sxz << onUnsigned();
@@ -1553,7 +1589,7 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 5: {
-        qInfo("onRepetition5");
+        //qInfo("onRepetition5");
         quint64 dx = onUnsigned(); // n - 2
         quint64 g = onUnsigned();
         QVector<quint32> sxz;
@@ -1564,7 +1600,7 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 6: {
-        qInfo("onRepetition6");
+        //qInfo("onRepetition6");
         quint64 dy = onUnsigned(); // n - 2
         QVector<quint32> syz;
         for (quint64 i = 0; i <= dy; ++i) {
@@ -1574,7 +1610,7 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 7: {
-        qInfo("onRepetition7");
+        //qInfo("onRepetition7");
         quint64 dy = onUnsigned(); // n - 2
         quint64 g = onUnsigned();
         QVector<quint32> syz;
@@ -1585,7 +1621,7 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 8: {
-        qInfo("onRepetition8");
+        //qInfo("onRepetition8");
         quint64 dn = onUnsigned();
         quint64 dm = onUnsigned();
         DeltaG pn = onDeltaG();
@@ -1594,15 +1630,14 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 9: {
-        qInfo("onRepetition9");
+        //qInfo("onRepetition9");
         quint64 d = onUnsigned();
         DeltaG p = onDeltaG();
-        qDebug() << d << p.value.m_x << p.value.m_y;
         m_repetition.reset(new Repetition9(d, p.value));
         break;
     }
     case 10: {
-        qInfo("onRepetition10");
+        //qInfo("onRepetition10");
         quint64 d = onUnsigned(); // p - 2
         QVector<DeltaValue> pz;
         for (quint64 i = 0; i <= d; ++i) {
@@ -1613,7 +1648,7 @@ void oa::Parser::onRepetition() {
         break;
     }
     case 11: {
-        qInfo("onRepetition11");
+        //qInfo("onRepetition11");
         quint64 d = onUnsigned(); // p - 2
         quint64 g = onUnsigned(); // grid;
         QVector<DeltaValue> pz;
@@ -1711,15 +1746,15 @@ void oa::Parser::onPointList(bool isPolygon) {
     }
 }
 
-oa::Parser::IntervalType oa::Parser::onInterval() {
+oa::IntervalType oa::Parser::onInterval() {
     quint8 type = onUnsigned();
     switch(type) {
     case 0:
-        return IntervalType {0, 1 << 24};
+        return IntervalType {0,  1UL << 63};
     case 1:
         return IntervalType {0, onUnsigned()};
     case 2:
-        return IntervalType {onUnsigned(), 1 << 24};
+        return IntervalType {onUnsigned(), 1UL << 63};
     case 3: {
         quint64 b = onUnsigned();
         return IntervalType {b, b};

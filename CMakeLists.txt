@@ -5,7 +5,7 @@ project(oasisReader)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 # Instruct CMake to run moc automatically when needed.
 set(CMAKE_AUTOMOC ON)
-list( APPEND CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS} -O2 -pipe -mtune=native -fprofile-arcs")
+list( APPEND CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS} -O3 -pipe -mtune=native ")
 
 # Find the QtWidgets library
 find_package(Qt5Widgets REQUIRED)

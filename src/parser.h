@@ -123,7 +123,6 @@ private:
     void onRepetition();
     void onPointList(bool isPolygon);
 
-    using IntervalType = QPair<quint64, quint64>;
     IntervalType onInterval();
     void undefineModalVariables();
 private:
