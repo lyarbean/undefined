@@ -20,7 +20,7 @@ oa::Delta23::Delta23(quint64 magnitude, bool isTwo)
             value = {0, m};
             break;
         case 2:
-            value = {-m, 0};
+            value = { -m, 0};
             break;
         case 3:
 
@@ -38,7 +38,7 @@ oa::Delta23::Delta23(quint64 magnitude, bool isTwo)
             value = {0, m};
             break;
         case 2:
-            value = {-m, 0};
+            value = { -m, 0};
             break;
         case 3:
             value = {0, -m};
@@ -47,10 +47,10 @@ oa::Delta23::Delta23(quint64 magnitude, bool isTwo)
             value = {m, m};
             break;
         case 5:
-            value = {-m, m};
+            value = { -m, m};
             break;
         case 6:
-            value = {-m, -m};
+            value = { -m, -m};
             break;
         case 7:
         default:
@@ -80,7 +80,7 @@ oa::DeltaG::DeltaG(quint64 magnitude)
         value = {0, m};
         break;
     case 2:
-        value = {-m, 0};
+        value = { -m, 0};
         break;
     case 3:
         value = {0, -m};
@@ -89,10 +89,10 @@ oa::DeltaG::DeltaG(quint64 magnitude)
         value = {m, m};
         break;
     case 5:
-        value = {-m, m};
+        value = { -m, m};
         break;
     case 6:
-        value = {-m, -m};
+        value = { -m, -m};
         break;
     case 7:
     default:
@@ -106,14 +106,15 @@ oa::DeltaG::DeltaG(qint64 x, qint64 y)
     value = {x, y};
 }
 
-QString oa::image(const DeltaValue& value)
+QString oa::image(const DeltaValue &value)
 {
     return QString("(%1, %2)").arg(value.m_x).arg(value.m_y);
 }
-QString oa::image(PointList* pointList) {
+QString oa::image(PointList *pointList)
+{
     QString s("PointList{");
     if (pointList) {
-        for (auto& p : *pointList) {
+        for (auto &p : *pointList) {
             s += image(p);
         }
     }
@@ -127,8 +128,8 @@ QVector<oa::DeltaValue> oa::Repetition1::values()
 {
     QVector<oa::DeltaValue> offsets;
     offsets.reserve((m_dx + 2) * (m_dy + 2));
-    for(int i = 0; i < m_dx + 2; ++i) {
-        for(int j=0; j < m_dy + 2; ++j) {
+    for (int i = 0; i < m_dx + 2; ++i) {
+        for (int j = 0; j < m_dy + 2; ++j) {
             offsets.append(oa::DeltaValue(m_sx * i, m_sy * j));
         }
     }
@@ -140,7 +141,7 @@ QVector<oa::DeltaValue> oa::Repetition2::values()
 {
     QVector<oa::DeltaValue> offsets;
     offsets.reserve(m_dx + 2);
-    for(int i = 0; i < m_dx + 2; ++i) {
+    for (int i = 0; i < m_dx + 2; ++i) {
         offsets.append(oa::DeltaValue(m_sx * i, 0));
     }
     return offsets;
@@ -151,19 +152,20 @@ QVector<oa::DeltaValue> oa::Repetition3::values()
 {
     QVector<oa::DeltaValue> offsets;
     offsets.reserve(m_dy + 2);
-    for(int i = 0; i < m_dy + 2; ++i) {
+    for (int i = 0; i < m_dy + 2; ++i) {
         offsets.append(oa::DeltaValue(0, m_sy * i));
     }
     return offsets;
 }
 
 // m_dx := N-2,  N x 1
-QVector<oa::DeltaValue> oa::Repetition4::values() {
+QVector<oa::DeltaValue> oa::Repetition4::values()
+{
     QVector<oa::DeltaValue> offsets;
     offsets.reserve(m_dx + 2);
     qint64 space = 0;
     offsets.append(oa::DeltaValue(space, 0));
-    for(int i = 0; i < m_dx + 1; ++i) {
+    for (int i = 0; i < m_dx + 1; ++i) {
         space += m_sxz[i];
         offsets.append(oa::DeltaValue(space, 0));
     }
@@ -177,7 +179,7 @@ QVector<oa::DeltaValue> oa::Repetition5::values()
     offsets.reserve(m_dx + 2);
     qint64 space = 0;
     offsets.append(oa::DeltaValue(space, 0));
-    for(int i = 0; i < m_dx + 1; ++i) {
+    for (int i = 0; i < m_dx + 1; ++i) {
         space += m_sxz[i];
         offsets.append(oa::DeltaValue(space * m_g, 0));
     }
@@ -190,7 +192,7 @@ QVector<oa::DeltaValue> oa::Repetition6::values()
     offsets.reserve(m_dy + 2);
     qint64 space = 0;
     offsets.append(oa::DeltaValue(0, space));
-    for(int i = 0; i < m_dy + 1; ++i) {
+    for (int i = 0; i < m_dy + 1; ++i) {
         space += m_syz[i];
         offsets.append(oa::DeltaValue(0, space));
     }
@@ -203,7 +205,7 @@ QVector<oa::DeltaValue> oa::Repetition7::values()
     offsets.reserve(m_dy + 2);
     qint64 space = 0;
     offsets.append(oa::DeltaValue(0, space));
-    for(int i = 0; i < m_dy + 1; ++i) {
+    for (int i = 0; i < m_dy + 1; ++i) {
         space += m_syz[i];
         offsets.append(oa::DeltaValue(space * m_g, 0));
     }
@@ -215,8 +217,8 @@ QVector<oa::DeltaValue> oa::Repetition8::values()
 {
     QVector<oa::DeltaValue> offsets;
     offsets.reserve((m_dn + 2) * (m_dm + 2));
-    for(int i = 0; i < m_dn + 2; ++i) {
-        for(int j=0; j < m_dm + 2; ++j) {
+    for (int i = 0; i < m_dn + 2; ++i) {
+        for (int j = 0; j < m_dm + 2; ++j) {
             offsets.append(oa::DeltaValue(i * m_pn.m_x + j * m_pm.m_x, i * m_pn.m_y + j * m_pm.m_y));
         }
     }
@@ -227,7 +229,7 @@ QVector<oa::DeltaValue> oa::Repetition9::values()
 {
     QVector<oa::DeltaValue> offsets;
     offsets.reserve(m_d + 2);
-    for(int i = 0; i < m_d + 2; ++i) {
+    for (int i = 0; i < m_d + 2; ++i) {
         offsets.append(oa::DeltaValue(i * m_p.m_x, i * m_p.m_y));
     }
     return offsets;
@@ -239,7 +241,7 @@ QVector<oa::DeltaValue> oa::Repetition10::values()
     qint64 spaceX = 0;
     qint64 spaceY = 0;
     offsets.append(oa::DeltaValue(spaceX, spaceY));
-    for(int i = 0; i < m_d + 1; ++i) {
+    for (int i = 0; i < m_d + 1; ++i) {
         spaceX += m_pz[i].m_x;
         spaceY += m_pz[i].m_y;
         offsets.append(oa::DeltaValue(spaceX, spaceY));
@@ -254,7 +256,7 @@ QVector<oa::DeltaValue> oa::Repetition11::values()
     qint64 spaceX = 0;
     qint64 spaceY = 0;
     offsets.append(oa::DeltaValue(spaceX, spaceY));
-    for(int i = 0; i < m_d + 1; ++i) {
+    for (int i = 0; i < m_d + 1; ++i) {
         spaceX += m_pz[i].m_x;
         spaceY += m_pz[i].m_y;
         offsets.append(oa::DeltaValue(spaceX * m_g, spaceY * m_g));
@@ -262,29 +264,30 @@ QVector<oa::DeltaValue> oa::Repetition11::values()
     return offsets;
 }
 
-QString oa::image(Repetition* repetition) {
+QString oa::image(Repetition *repetition)
+{
     if (!repetition) {
         return QString("No repetition");
     }
-    switch(repetition->type()) {
+    switch (repetition->type()) {
     case 1: {
-        Repetition1* r = static_cast<Repetition1*>(repetition);
+        Repetition1 *r = static_cast<Repetition1 *>(repetition);
         return QString("Repetition1{%1, %2, %3, %4}").arg(r->m_dx).arg(r->m_dy).arg(r->m_sx).arg(r->m_sy);
     }
     case 2: {
-        Repetition2* r = static_cast<Repetition2*>(repetition);
+        Repetition2 *r = static_cast<Repetition2 *>(repetition);
         return QString("Repetition2{%1, %2}").arg(r->m_dx).arg(r->m_sx);
     }
     case 3: {
-        Repetition3* r = static_cast<Repetition3*>(repetition);
+        Repetition3 *r = static_cast<Repetition3 *>(repetition);
         return QString("Repetition3{%1, %2}").arg(r->m_dy).arg(r->m_sy);
     }
     case 4: {
-        Repetition4* r = static_cast<Repetition4*>(repetition);
+        Repetition4 *r = static_cast<Repetition4 *>(repetition);
         QString s("Repetition4{");
         s += QString::number(r->m_dx);
         s += ", (";
-        for (auto z: r->m_sxz) {
+        for (auto z : r->m_sxz) {
             s += QString::number(z);
             s += " ";
         }
@@ -292,13 +295,13 @@ QString oa::image(Repetition* repetition) {
         return s;
     }
     case 5: {
-        Repetition5* r = static_cast<Repetition5*>(repetition);
+        Repetition5 *r = static_cast<Repetition5 *>(repetition);
         QString s("Repetition5{");
         s += QString::number(r->m_dx);
         s += ", ";
         s += QString::number(r->m_g);
         s += ", (";
-        for (auto z: r->m_sxz) {
+        for (auto z : r->m_sxz) {
             s += QString::number(z);
             s += ", ";
         }
@@ -306,11 +309,11 @@ QString oa::image(Repetition* repetition) {
         return s;
     }
     case 6: {
-        Repetition6* r = static_cast<Repetition6*>(repetition);
+        Repetition6 *r = static_cast<Repetition6 *>(repetition);
         QString s("Repetition4{");
         s += QString::number(r->m_dy);
         s += ", (";
-        for (auto z: r->m_syz) {
+        for (auto z : r->m_syz) {
             s += QString::number(z);
             s += ", ";
         }
@@ -318,13 +321,13 @@ QString oa::image(Repetition* repetition) {
         return s;
     }
     case 7: {
-        Repetition7* r = static_cast<Repetition7*>(repetition);
+        Repetition7 *r = static_cast<Repetition7 *>(repetition);
         QString s("Repetition7{");
         s += QString::number(r->m_dy);
         s += ", ";
         s += QString::number(r->m_g);
         s += ", (";
-        for (auto z: r->m_syz) {
+        for (auto z : r->m_syz) {
             s += QString::number(z);
             s += ", ";
         }
@@ -332,19 +335,19 @@ QString oa::image(Repetition* repetition) {
         return s;
     }
     case 8: {
-        Repetition8* r = static_cast<Repetition8*>(repetition);
+        Repetition8 *r = static_cast<Repetition8 *>(repetition);
         return QString("Repetition8{(%1, %2), (%3, %4), (%5, %6)}").arg(r->m_dn).arg(r->m_dm).arg(r->m_pn.m_x).arg(r->m_pn.m_x).arg(r->m_pm.m_x).arg(r->m_pm.m_y);
     }
     case 9: {
-        Repetition9* r = static_cast<Repetition9*>(repetition);
+        Repetition9 *r = static_cast<Repetition9 *>(repetition);
         return QString("Repetition9{%1, (%2, %3)}").arg(r->m_d).arg(r->m_p.m_x).arg(r->m_p.m_y);
     }
     case 10: {
-        Repetition10* r = static_cast<Repetition10*>(repetition);
+        Repetition10 *r = static_cast<Repetition10 *>(repetition);
         QString s("Repetition10{");
         s += QString::number(r->m_d);
         s += ", (";
-        for (auto z: r->m_pz) {
+        for (auto z : r->m_pz) {
             s += image(z);
             s += ", ";
         }
@@ -352,13 +355,13 @@ QString oa::image(Repetition* repetition) {
         return s;
     }
     case 11: {
-        Repetition11* r = static_cast<Repetition11*>(repetition);
+        Repetition11 *r = static_cast<Repetition11 *>(repetition);
         QString s("Repetition10{");
         s += QString::number(r->m_d);
         s += ", ";
         s += QString::number(r->m_g);
         s += ", (";
-        for (auto& z: r->m_pz) {
+        for (auto &z : r->m_pz) {
             s += image(z);
             s += ", ";
         }
@@ -370,8 +373,9 @@ QString oa::image(Repetition* repetition) {
     }
 }
 
-QString oa::image(const Placement& p) {
-    return QString("Placement{%1, %2, %3, %4, %5, %6, %7}")
+QString oa::image(const Placement &p)
+{
+    return QString("Placement{N%1, M%2, A%3, X%4, Y%5, F%6, %7}")
            .arg(p.m_cellName)
            .arg(p.m_manification)
            .arg(p.m_angle)
@@ -381,8 +385,9 @@ QString oa::image(const Placement& p) {
            .arg(image(p.m_repetition.data()));
 }
 
-QString oa::image(const Text& t) {
-    return QString("Text{%1, %2, %3, %4, %5, %6}")
+QString oa::image(const Text &t)
+{
+    return QString("Text{X%1, Y%2, L%3, D%4, S[%5], %6}")
            .arg(t.m_x)
            .arg(t.m_y)
            .arg(t.m_textLayer)
@@ -391,8 +396,9 @@ QString oa::image(const Text& t) {
            .arg(image(t.m_repetition.data()));
 }
 
-QString oa::image(const Rectangle& r) {
-    return QString("Rectangle{%1, %2, %3, %4, %5, %6, %7}")
+QString oa::image(const Rectangle &r)
+{
+    return QString("Rectangle{X%1, Y%2, H%3, W%4, L%5, D%6, %7}")
            .arg(r.m_x)
            .arg(r.m_y)
            .arg(r.m_height)
@@ -402,8 +408,9 @@ QString oa::image(const Rectangle& r) {
            .arg(image(r.m_repetition.data()));
 }
 
-QString oa::image(const Polygon& p) {
-    return QString("Polygon{%1, %2, %3, %4, %5, %6}")
+QString oa::image(const Polygon &p)
+{
+    return QString("Polygon{X%1, Y%2, L%3, D%4, %5, %6}")
            .arg(p.m_x)
            .arg(p.m_y)
            .arg(p.m_layer)
@@ -413,8 +420,9 @@ QString oa::image(const Polygon& p) {
 }
 
 
-QString oa::image(const Path& p) {
-    return QString("Path{%1, %2, %3, %4, %5, %6, %7, %8, %9}")
+QString oa::image(const Path &p)
+{
+    return QString("Path{X%1, Y%2, L%3, D%4, HW%5, S%6, E%7, %8, %9}")
            .arg(p.m_x)
            .arg(p.m_y)
            .arg(p.m_layer)
@@ -426,8 +434,9 @@ QString oa::image(const Path& p) {
            .arg(image(p.m_repetition.data()));
 }
 
-QString oa::image(const Trapezoid& t) {
-    return QString("Trapezoid{%1, %2, %3, %4, %5, %6, %7}")
+QString oa::image(const Trapezoid &t)
+{
+    return QString("Trapezoid{X%1, Y%2, H%3, W%4, L%5, D%6, %7}")
            .arg(t.m_x)
            .arg(t.m_y)
            .arg(t.m_height)
@@ -438,8 +447,9 @@ QString oa::image(const Trapezoid& t) {
            .arg(image(t.m_repetition.data()));
 }
 
-QString oa::image(const CTrapezoid& t) {
-    return QString("CTrapezoid{%1, %2, %3, %4, %5, %6, %7}")
+QString oa::image(const CTrapezoid &t)
+{
+    return QString("CTrapezoid{X%1, Y%2, H%3, W%4, L%5, D%6, %7}")
            .arg(t.m_x)
            .arg(t.m_y)
            .arg(t.m_height)
@@ -450,8 +460,9 @@ QString oa::image(const CTrapezoid& t) {
            .arg(image(t.m_repetition.data()));
 }
 
-QString oa::image(const Circle& c) {
-    return QString("Circle{%1, %2, %3, %4, %5, %6}")
+QString oa::image(const Circle &c)
+{
+    return QString("Circle{X%1, Y%2, R%3, L%4, D%5, %6}")
            .arg(c.m_x)
            .arg(c.m_y)
            .arg(c.m_radius)
@@ -460,8 +471,9 @@ QString oa::image(const Circle& c) {
            .arg(image(c.m_repetition.data()));
 }
 
-QString oa::image(const XGeometry& x) {
-    return QString("XGeometry{%1, %2, %3, %4, %5, %6}")
+QString oa::image(const XGeometry &x)
+{
+    return QString("XGeometry{X%1, Y%2, L%3, D%4, A%5, S[%6], %7}")
            .arg(x.m_x)
            .arg(x.m_y)
            .arg(x.m_layer)
@@ -471,63 +483,64 @@ QString oa::image(const XGeometry& x) {
            .arg(image(x.m_repetition.data()));
 }
 
-void oa::Layout::put() {
-    for (auto& c : m_cells) {
+void oa::Layout::put()
+{
+    for (auto &c : m_cells) {
         qDebug() << "Cell of " << c.m_name;
         if (!c.m_cell) {
             qDebug() << "Empty Cell";
         } else {
             if (!c.m_cell->m_rectangles.empty()) {
                 qDebug() << "Rectangles";
-                for (auto& r: c.m_cell->m_rectangles) {
+                for (auto &r : c.m_cell->m_rectangles) {
                     qDebug() << image(r);
                 }
             }
             if (!c.m_cell->m_polygons.empty()) {
                 qDebug() << "Polygons";
-                for (auto& p: c.m_cell->m_polygons) {
+                for (auto &p : c.m_cell->m_polygons) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_paths.empty()) {
                 qDebug() << "Paths";
-                for (auto& p: c.m_cell->m_paths) {
+                for (auto &p : c.m_cell->m_paths) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_trapezoids.empty()) {
                 qDebug() << "Trapezoids";
-                for (auto& p: c.m_cell->m_trapezoids) {
+                for (auto &p : c.m_cell->m_trapezoids) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_ctrapezoids.empty()) {
                 qDebug() << "CTrapezoids";
-                for (auto& p: c.m_cell->m_ctrapezoids) {
+                for (auto &p : c.m_cell->m_ctrapezoids) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_circles.empty()) {
                 qDebug() << "Circles";
-                for (auto& p: c.m_cell->m_circles) {
+                for (auto &p : c.m_cell->m_circles) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_xgeometries.empty()) {
                 qDebug() << "XGeometries";
-                for (auto& p: c.m_cell->m_xgeometries) {
+                for (auto &p : c.m_cell->m_xgeometries) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_placements.empty()) {
                 qDebug() << "Placements";
-                for (auto& p: c.m_cell->m_placements) {
+                for (auto &p : c.m_cell->m_placements) {
                     qDebug() << image(p);
                 }
             }
             if (!c.m_cell->m_texts.empty()) {
                 qDebug() << "Texts";
-                for (auto& t: c.m_cell->m_texts) {
+                for (auto &t : c.m_cell->m_texts) {
                     qDebug() << image(t);
                 }
             }

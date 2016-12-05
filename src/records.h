@@ -42,7 +42,7 @@ QString image(PointList* pointList);
 
 
 
-// TODO A repetition holds positions to repeate shape. 
+// TODO A repetition holds positions to repeate shape.
 // To improve rendering, we may just give some positions that fit a given boundry.
 
 struct Repetition
@@ -64,7 +64,7 @@ struct Repetition1 : public Repetition {
         return Type;
     }
     Repetition1(quint32 dx, quint32 dy, quint32 sx, quint32 sy)
-    : m_dx(dx), m_dy(dy), m_sx(sx), m_sy(sy) {}
+        : m_dx(dx), m_dy(dy), m_sx(sx), m_sy(sy) {}
     virtual QVector<DeltaValue> values() override;
 
     quint32 m_dx, m_dy, m_sx, m_sy;
@@ -158,7 +158,7 @@ struct Repetition7 : public Repetition {
     virtual int type() const {
         return Type;
     }
-   Repetition7(quint32 dy, quint32 g, const QVector<quint32>& syz) : m_dy(dy), m_g(g), m_syz(syz) {}
+    Repetition7(quint32 dy, quint32 g, const QVector<quint32>& syz) : m_dy(dy), m_g(g), m_syz(syz) {}
     virtual QVector<DeltaValue> values() override;
     // Similar to Repetition5, but row and column exchanged.
     quint32 m_dy;
@@ -174,7 +174,7 @@ struct Repetition8 : public Repetition {
         return Type;
     }
     Repetition8(quint32 dn, quint32 dm, const DeltaValue& pn, const DeltaValue& pm)
-    : m_dn(dn), m_dm(dm), m_pn(pn), m_pm(pm) {}
+        : m_dn(dn), m_dm(dm), m_pn(pn), m_pm(pm) {}
     virtual QVector<DeltaValue> values() override;
     quint32 m_dn, m_dm;
     DeltaValue m_pn, m_pm;
@@ -334,8 +334,7 @@ struct XGeometry {
 };
 QString image(const XGeometry& x);
 
-struct Cell
-{
+struct Cell {
     Cell() = default;
     QVector<Rectangle> m_rectangles;
     QVector<Polygon> m_polygons;
@@ -347,10 +346,11 @@ struct Cell
     QVector<Placement> m_placements;
     QVector<Text> m_texts;
     QVector<XELement> m_xelements;
+    QVector<QSharedPointer<PointList> > m_pointLists;
+    QVector<QSharedPointer<Repetition> > m_repetition;
 };
 
-class Layout
-{
+class Layout {
 public:
     Layout() : m_unit(1) {}
     void put();

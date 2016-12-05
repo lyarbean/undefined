@@ -27,8 +27,7 @@
 
 #include "records.h"
 
-class QFile;
-
+class QIODevice;
 namespace oa {
 
 class Layout;
@@ -38,9 +37,9 @@ public:
     Parser(Layout& layout);
     bool open(const QString& filename);
 protected:
-    bool parse();
-    void beginStart();
-    void readTableOffsets();
+    bool parse(QIODevice& dataStream);
+    void beginStart(QIODevice& dataStream);
+    void readTableOffsets(QIODevice& dataStream);
 private:
     enum RecordType {
         PAD = 0,
@@ -79,55 +78,54 @@ private:
         XGEOMETRY = 33,
         CBLOCK = 34
     };
-    void nextRecord();
+    void nextRecord(QIODevice& dataStream);
     // Records
-    void onPad();
-    void onStart();
-    void onEnd();
-    void onCellName(int type); // 3 or 4
-    void onTextString(int type); // 5 or 6
-    void onPropName(int type);
-    void onPropString(int type);
-    void onLayerName(int type);
-    void onCell(int type);
+    void onPad(QIODevice& dataStream);
+    void onStart(QIODevice& dataStream);
+    void onEnd(QIODevice& dataStream);
+    void onCellName(QIODevice& dataStream, int type); // 3 or 4
+    void onTextString(QIODevice& dataStream, int type); // 5 or 6
+    void onPropName(QIODevice& dataStream, int type);
+    void onPropString(QIODevice& dataStream, int type);
+    void onLayerName(QIODevice& dataStream, int type);
+    void onCell(QIODevice& dataStream, int type);
     void onXYAbsolute();
     void onXYRelative();
-    void onPlacement(int type);
-    void onText();
-    void onRectangle();
-    void onPolygon();
-    void onPath();
-    void onTrapezoid(int type);
-    void onCTrapezoid();
-    void onCircle();
-    void onProperty(int type);
-    void onXName(int type);
-    void onXElement();
-    void onXGeometry();
-    void onCBlock();
+    void onPlacement(QIODevice& dataStream, int type);
+    void onText(QIODevice& dataStream);
+    void onRectangle(QIODevice& dataStream);
+    void onPolygon(QIODevice& dataStream);
+    void onPath(QIODevice& dataStream);
+    void onTrapezoid(QIODevice& dataStream, int type);
+    void onCTrapezoid(QIODevice& dataStream);
+    void onCircle(QIODevice& dataStream);
+    void onProperty(QIODevice& dataStream, int type);
+    void onXName(QIODevice& dataStream, int type);
+    void onXElement(QIODevice& dataStream);
+    void onXGeometry(QIODevice& dataStream);
+    void onCBlock(QIODevice& dataStream);
     // Data
-    quint64 onUnsigned();
-    qint64 onSigned();
-    double onReal();
-    Delta23 onDelta2();
-    Delta23 onDelta3();
-    DeltaG onDeltaG();
+    quint64 onUnsigned(QIODevice& dataStream);
+    qint64 onSigned(QIODevice& dataStream);
+    double onReal(QIODevice& dataStream);
+    Delta23 onDelta2(QIODevice& dataStream);
+    Delta23 onDelta3(QIODevice& dataStream);
+    DeltaG onDeltaG(QIODevice& dataStream);
     enum StringType {
         A,
         B,
         N
     };
-    QString onString(StringType type = A); // TODO Validation
+    QString onString(QIODevice& dataStream, StringType type = A); // TODO Validation
 
     // Composite
-    void onRepetition();
-    void onPointList(bool isPolygon);
+    void onRepetition(QIODevice& dataStream);
+    void onPointList(QIODevice& dataStream, bool isPolygon);
 
-    IntervalType onInterval();
+    IntervalType onInterval(QIODevice& dataStream);
     void undefineModalVariables();
 private:
     Layout& m_layout;
-    QScopedPointer<QFile> m_dataStream;
     QSharedPointer<Cell> m_currentCell;
     QMap<qint64, QString> m_unresolvedCellName;
     QMap<qint64, QString> m_unresolvedPropName;
