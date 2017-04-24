@@ -48,7 +48,7 @@ void BeanCellItemPrivate::initialize()
         "   fcolor = vec4(.9,.6,.1, 1.0);\n"
         "   gl_Position = vposition + vec4(voffset, 0);\n"
         "}\n";
-    vshader->compileSourceCode(vsrc1);
+    vshader->compileSourceCode(vsrc);
 
     QOpenGLShader *fshader = new QOpenGLShader(QOpenGLShader::Fragment, &m_program);
     const char *fsrc =

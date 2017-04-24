@@ -25,7 +25,8 @@
 #include <QString>
 #include <QVariant>
 
-#include "records.h"
+// #include "records.h"
+#include "mesh.h"
 
 class QIODevice;
 namespace oa {
@@ -126,7 +127,8 @@ private:
     void undefineModalVariables();
 private:
     Layout& m_layout;
-    QSharedPointer<Cell> m_currentCell;
+    // QSharedPointer<Cell> m_currentCell;
+    Cell* m_currentCell;
     QMap<qint64, QString> m_unresolvedCellName;
     QMap<qint64, QString> m_unresolvedPropName;
     QMap<qint64, QString> m_unresolvedTextString;
@@ -152,9 +154,19 @@ private:
     //      Modal variables     //
     //////////////////////////////
     bool m_isXYRelative; // xy-mode
-    QSharedPointer<Repetition> m_repetition;
-    QSharedPointer<PointList> m_polygonPointList;
-    QSharedPointer<PointList> m_pointList;
+
+    qint32 m_repetitionOffset;
+    qint32 m_repetitionCount;
+    // QSharedPointer<Repetition> m_repetition;
+    
+    qint32 m_polygonPointListOffset;
+    qint32 m_polygonPointListCount;
+    // QSharedPointer<PointList> m_polygonPointList;
+    
+    qint32 m_pointListOffset;
+    qint32 m_pointListCount;
+//     QSharedPointer<PointList> m_pointList;
+
     QString m_placementCell;
     quint32 m_layer, m_datatype;
     quint32 m_textLayer, m_textType;

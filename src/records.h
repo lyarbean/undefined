@@ -245,6 +245,18 @@ struct Text {
 };
 QString image(const Text& t);
 
+// m_repetitionsBuffer := {{0,0}, {0, 0}, {2,3}, {4, 3}, {0, 0}, {1, 2} {3, 5}, {0, 0} ... }
+// TODO such representation is too sparse as {0, 0} shows up many times, can we save more space
+
+// Given x, y, w, h, we have (x,y), (x+w,y), (x+w,y+h),(x,y+h),
+// then push them into vertexes buffer, and retain m_baseVertex and m_vertexCount.
+// FIXME need dynamic bind
+// Given a repitition, we have PointList, then push them into instanced
+// buffer (or not if previous is used), /*and retain instanced offset*/ retain m_instanceCount.
+// To Draw this Rectangle:
+// glDrawElementsInstancedBaseVertex(GL_TRIANGLES, m_vertexCount, GL_UNSIGNED_INT, 
+// (void*)(sizeof(unsigned int) * m_baseIndex), m_instanceCount, m_baseVertex);
+
 struct Rectangle {
     Rectangle() : m_x(0), m_y(0), m_height(0), m_width(0), m_layer(0), m_datatype(0), m_repetition(nullptr) {}
     qint64 m_x, m_y;
@@ -253,6 +265,8 @@ struct Rectangle {
     quint32 m_datatype;
     QSharedPointer<Repetition> m_repetition;
 };
+
+
 QString image(const Rectangle& r);
 
 struct Polygon
@@ -368,6 +382,8 @@ public:
     QMap<qint64, NamedCell> m_cells;
     // auto cell = m_cells[m_cellNameToReference[cellname]];
     QMap<QString, qint64> m_cellNameToReference;
+
+    
 };
 }
 #endif // OA_RECORDS_H

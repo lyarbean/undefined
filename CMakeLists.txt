@@ -5,7 +5,7 @@ project(oasisReader)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 # Instruct CMake to run moc automatically when needed.
 set(CMAKE_AUTOMOC ON)
-list( APPEND CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS} -O3 -pipe -mtune=native ")
+list( APPEND CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS}  -pipe -mtune=native ")
 
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Core REQUIRED)
@@ -13,13 +13,14 @@ find_package(Qt5Quick REQUIRED)
 
 set(oasisreader_SRC
   src/main.cpp
-  src/beancellitem.cpp
-  src/renderhelper.cpp
+#   src/beancellitem.cpp
+#   src/renderhelper.cpp
 )
 
 
 set(parser_SRC
-src/records.cpp
+# src/records.cpp
+src/mesh.cpp
 src/parser.cpp)
 
 add_library(parser ${parser_SRC})

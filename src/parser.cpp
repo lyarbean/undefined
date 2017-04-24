@@ -1,3 +1,4 @@
+#include <GL/gl.h>
 /*
  * <one line to give the program's name and a brief idea of what it does.>
  * Copyright 2015  颜烈彬 <slbyan@gmail.com>
@@ -30,7 +31,7 @@
 #include <stdexcept>
 
 oa::Parser::Parser(Layout &layout)
-    : m_layout(layout), m_offsetFlag(true),
+    : m_layout(layout), m_currentCell(nullptr), m_offsetFlag(true),
       m_cellNameMode(Default),
       m_textStringMode(Default),
       m_propNameMode(Default),
@@ -41,7 +42,13 @@ oa::Parser::Parser(Layout &layout)
       m_textStringReference(0),
       m_propNameReference(0),
       m_propStringReference(0),
-      m_xNameReference(0)
+      m_xNameReference(0),
+      m_repetitionOffset(-1),
+      m_repetitionCount(0),
+      m_polygonPointListOffset(-1),
+      m_polygonPointListCount(-1),
+      m_pointListOffset(-1),
+      m_pointListCount(-1)
 {
     undefineModalVariables();
 }
@@ -63,7 +70,7 @@ bool oa::Parser::open(const QString &filename)
 
         }
         r = parse(dataStream);
-        m_layout.put();
+//         m_layout.put();
     } catch (std::exception &e) {
         qDebug() << e.what();
     }
@@ -552,8 +559,8 @@ void oa::Parser::onLayerName(QIODevice& dataStream, int type)
 void oa::Parser::onCell(QIODevice& dataStream, int type)
 {
     //qInfo("onCell");
-    QSharedPointer<Cell> cell(new Cell);
-    m_currentCell = cell;
+    // QSharedPointer<Cell> cell(new Cell);
+    m_currentCell = new Cell;
     if (type == 13) {
         quint32 cellReference = onUnsigned(dataStream);
         auto c = m_layout.m_cells.find(cellReference);
@@ -561,16 +568,16 @@ void oa::Parser::onCell(QIODevice& dataStream, int type)
             if (c->m_cell) {
                 throw std::domain_error("Duplicated  cell reference-number");
             }
-            c->m_cell = cell;
+            c->m_cell = m_currentCell;
         } else {
             // name is not read yet, shall be read in a CellName record
-            m_layout.m_cells[cellReference].m_cell = cell;
+            m_layout.m_cells[cellReference].m_cell = m_currentCell;
         }
     } else {
         // TODO name duplication check
         QString name = onString(dataStream, N);
         m_cellLocalNameReference ++;
-        m_layout.m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, cell};
+        m_layout.m_cells[- static_cast<qint64>(m_cellLocalNameReference)] = {name, m_currentCell};
         m_layout.m_cellNameToReference[name] = -static_cast<qint64>(m_cellLocalNameReference);
     }
     // reset modal variables
@@ -641,25 +648,23 @@ void oa::Parser::onPlacement(QIODevice& dataStream, int type)
     }
 
     placement.m_cellName = m_placementCell;
-
+    qreal mag(1.0), angle(0.0);
     if (type == 18) {
         if ((info >> 2) & 1) { // M
-            placement.m_manification = onReal(dataStream);
-        } else {
-            placement.m_manification = 1.0;
+            mag = onReal(dataStream);
         }
         if ((info >> 1) & 1) { // A
-            placement.m_angle = onReal(dataStream);
+            angle = onReal(dataStream);
         } else {
-            placement.m_angle = 0.0;
+            angle = 0.0;
         }
-        if (placement.m_manification <= 0) {
-            throw std::domain_error("onPlacement: Manification is not positive");
+        if (mag <= 0.0) {
+            throw std::domain_error("onPlacement: Magnification is not positive");
         }
-        if (std::isnan(placement.m_manification) ||  std::isinf(placement.m_manification)) {
-            throw std::domain_error("onPlacement: Manification is out of range");
+        if (std::isnan(mag) || std::isinf(mag)) {
+            throw std::domain_error("onPlacement: Magnification is out of range");
         }
-        if (std::isnan(placement.m_angle) ||  std::isinf(placement.m_angle)) {
+        if (std::isnan(angle) || std::isinf(angle)) {
             throw std::domain_error("onPlacement: Angle is out of range");
         }
     }
@@ -672,7 +677,7 @@ void oa::Parser::onPlacement(QIODevice& dataStream, int type)
         }
     }
 
-    placement.m_x = m_placementX;
+    // placement.m_x = m_placementX;
 
     if ((info >> 4) & 1) { // Y
         qint64 y = onSigned(dataStream);
@@ -682,13 +687,29 @@ void oa::Parser::onPlacement(QIODevice& dataStream, int type)
             m_placementY = y;
         }
     }
-    placement.m_y = m_placementY;
+    // placement.m_y = m_placementY;
 
     if ((info >> 3) & 1) { // R
         onRepetition(dataStream);
-        placement.m_repetition = m_repetition;
+        //  placement.m_repetition = m_repetition;
     }
-    placement.m_flip = (info & 0b1); // F
+    //FIXME if no repetition
+    qint32 flip = (info & 0b1) ? -1 : 1;
+    qint32 x00 = cos(angle/90) * mag;
+    qint32 x01 = sin(angle/90) * mag;
+    qint32 x10 = -flip * x01;
+    qint32 x11 = flip * x00;
+    for (auto i = 0; i < m_repetitionCount; ++i)
+    {
+        Placement::X p;
+        p.x00 = x00;
+        p.x01 = x01;
+        p.x10 = x10;
+        p.x11 = x11;
+        p.x20 = m_placementX + m_layout.m_repetitions[m_repetitionOffset + i].m_x;
+        p.x21 = m_placementY + m_layout.m_repetitions[m_repetitionOffset + i].m_y;
+        placement.m_matrixes.append(p);
+    }
     m_currentCell->m_placements.append(placement);
     // TODO onProperty
 }
@@ -760,7 +781,8 @@ void oa::Parser::onText(QIODevice& dataStream)
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        text.m_repetition = m_repetition;
+        text.m_repetitionOffset = m_repetitionOffset;
+        text.m_repetitionCount = m_repetitionCount;
     }
     m_currentCell->m_texts.append(text);
 }
@@ -768,7 +790,7 @@ void oa::Parser::onText(QIODevice& dataStream)
 void oa::Parser::onRectangle(QIODevice& dataStream)
 {
     //qInfo("onRectangle");
-    Rectangle rectangle;
+    // Rectangle rectangle;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onRectangle: read error");
@@ -796,10 +818,10 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
         m_geometryH = m_geometryW;
         m_modalVariableSetStatus.m_d.geometryH = 1;
     }
-    rectangle.m_layer = m_layer;
-    rectangle.m_datatype = m_datatype;
-    rectangle.m_width = m_geometryW;
-    rectangle.m_height = m_geometryH;
+//     rectangle.m_layer = m_layer;
+//     rectangle.m_datatype = m_datatype;
+//     rectangle.m_width = m_geometryW;
+//     rectangle.m_height = m_geometryH;
     if (!(m_modalVariableSetStatus.m_d.layer & m_modalVariableSetStatus.m_d.datatype
             & m_modalVariableSetStatus.m_d.geometryW  & m_modalVariableSetStatus.m_d.geometryH)) {
         throw std::domain_error("onRectangle: required modal variables not set");
@@ -812,7 +834,7 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
             m_geometryX = x;
         }
     }
-    rectangle.m_x = m_geometryX;
+//     rectangle.m_x = m_geometryX;
 
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
@@ -822,19 +844,33 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    rectangle.m_y = m_geometryY;
+//     rectangle.m_y = m_geometryY;
+    // Generate Rectangle
+    Mesh mesh;
+    mesh.m_datatype = m_datatype;
+    mesh.m_layer = m_layer;
+    mesh.m_oasisType = (qint16)RECTANGLE;
+    mesh.m_drawType = (qint16)GL_TRIANGLES;
+    mesh.m_baseVertex = m_layout.m_vertexes.size();
+    m_layout.m_vertexes.append(DeltaValue{m_geometryX, m_geometryY});
+    m_layout.m_vertexes.append(DeltaValue{m_geometryX + m_geometryW, m_geometryY});
+    m_layout.m_vertexes.append(DeltaValue{m_geometryX + m_geometryW, m_geometryY + m_geometryH});
+    m_layout.m_vertexes.append(DeltaValue{m_geometryX, m_geometryY + m_geometryH});
+    mesh.m_vertexCount = 4;
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        rectangle.m_repetition = m_repetition;
+        mesh.m_repetitionOffset = m_repetitionOffset;
+        mesh.m_repetitionCount = m_repetitionCount;
     }
-    m_currentCell->m_rectangles.append(rectangle);
+    m_currentCell->m_meshes.append(mesh);
+    // m_currentCell->m_rectangles.append(rectangle);
 }
 
 void oa::Parser::onPolygon(QIODevice& dataStream)
 {
     //qInfo("onPolygon");
-    Polygon polygon;
+//     Polygon polygon;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onPolygon: read error");
@@ -858,9 +894,9 @@ void oa::Parser::onPolygon(QIODevice& dataStream)
             & m_modalVariableSetStatus.m_d.polygonPointList)) {
         throw std::domain_error("onPolygon: required modal variables not set");
     }
-    polygon.m_layer = m_layer;
-    polygon.m_datatype = m_datatype;
-    polygon.m_pointList = m_polygonPointList;
+//     polygon.m_layer = m_layer;
+//     polygon.m_datatype = m_datatype;
+//     polygon.m_pointList = m_polygonPointList;
 
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned(dataStream);
@@ -870,7 +906,7 @@ void oa::Parser::onPolygon(QIODevice& dataStream)
             m_geometryX = x;
         }
     }
-    polygon.m_x = m_geometryX;
+//     polygon.m_x = m_geometryX;
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
         if (m_isXYRelative) {
@@ -879,13 +915,27 @@ void oa::Parser::onPolygon(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    polygon.m_y = m_geometryY;
+//     polygon.m_y = m_geometryY;
+
+//     if ((info >> 2) & 1) { // R
+//         onRepetition(dataStream);
+//         polygon.m_repetition = m_repetition;
+//     }
+//     m_currentCell->m_polygons.append(polygon);
+    Mesh mesh;
+    mesh.m_datatype = m_datatype;
+    mesh.m_layer = m_layer;
+    mesh.m_oasisType = (qint16)RECTANGLE;
+    mesh.m_drawType = (qint16)GL_TRIANGLES;
+    mesh.m_baseVertex = m_polygonPointListOffset;
+    mesh.m_vertexCount = m_polygonPointListCount;
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        polygon.m_repetition = m_repetition;
+        mesh.m_repetitionOffset = m_repetitionOffset;
+        mesh.m_repetitionCount = m_repetitionCount;
     }
-    m_currentCell->m_polygons.append(polygon);
+    m_currentCell->m_meshes.append(mesh);
 }
 
 
@@ -968,25 +1018,41 @@ void oa::Parser::onPath(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    Path path;
-    path.m_layer = m_layer;
-    path.m_datatype = m_datatype;
-    path.m_halfWidth = m_halfWidth;
-    path.m_startExtension = m_startExtension;
-    path.m_endExtension = m_endExtension;
-    path.m_pointList = m_pointList;
-    path.m_x = m_geometryX;
-    path.m_y = m_geometryY;
+    Mesh mesh;
+    mesh.m_datatype = m_datatype;
+    mesh.m_layer = m_layer;
+    mesh.m_oasisType = (qint16)RECTANGLE;
+    mesh.m_drawType = (qint16)GL_TRIANGLES;
+    mesh.m_baseVertex = m_pointListOffset;
+    mesh.m_vertexCount = m_pointListCount;
+
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        path.m_repetition = m_repetition;
+        mesh.m_repetitionOffset = m_repetitionOffset;
+        mesh.m_repetitionCount = m_repetitionCount;
     }
-    m_currentCell->m_paths.append(path);
+    m_currentCell->m_meshes.append(mesh);
+    
+//     Path path;
+//     path.m_layer = m_layer;
+//     path.m_datatype = m_datatype;
+//     path.m_halfWidth = m_halfWidth;
+//     path.m_startExtension = m_startExtension;
+//     path.m_endExtension = m_endExtension;
+//     path.m_pointList = m_pointList;
+//     path.m_x = m_geometryX;
+//     path.m_y = m_geometryY;
+//     if ((info >> 2) & 1) { // R
+//         onRepetition(dataStream);
+//         path.m_repetition = m_repetition;
+//     }
+//     m_currentCell->m_paths.append(path);
 }
 
+// FIXME
 void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
 {
-    Trapezoid trapezoid;
+//     Trapezoid trapezoid;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onTrapezoid: read error");
@@ -1014,10 +1080,10 @@ void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
             & m_modalVariableSetStatus.m_d.geometryW)) {
         throw std::domain_error("onTrapezoid: required modal variables not set");
     }
-    trapezoid.m_layer = m_layer;
-    trapezoid.m_datatype = m_datatype;
-    trapezoid.m_width = m_geometryW;
-    trapezoid.m_height = m_geometryH;
+//     trapezoid.m_layer = m_layer;
+//     trapezoid.m_datatype = m_datatype;
+//     trapezoid.m_width = m_geometryW;
+//     trapezoid.m_height = m_geometryH;
     qint64 a = 0, b = 0;
     if (type == 23) {
         a = onSigned(dataStream);
@@ -1029,7 +1095,7 @@ void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
     }
     // FIXME
     // construct points
-    trapezoid.m_isHorizontal = ((info >> 7) & 1);
+//     trapezoid.m_isHorizontal = ((info >> 7) & 1);
 //     if ((info >> 7) & 1) { // O
 //         trapezoid.m_points << DeltaValue {0, qMax<qint64>(a, 0)};
 //         trapezoid.m_points << DeltaValue {0, m_geometryH + qMin<qint64>(b, 0)};
@@ -1049,7 +1115,7 @@ void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
             m_geometryX = x;
         }
     }
-    trapezoid.m_x = m_geometryX;
+//     trapezoid.m_x = m_geometryX;
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
         if (m_isXYRelative) {
@@ -1058,18 +1124,19 @@ void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
             m_geometryY = y;
         }
     }
-    trapezoid.m_y = m_geometryY;
+//     trapezoid.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        trapezoid.m_repetition = m_repetition;
+        //trapezoid.m_repetition = m_repetition;
     }
-    m_currentCell->m_trapezoids.append(trapezoid);
+//     m_currentCell->m_trapezoids.append(trapezoid);
 }
 
+// FIXME
 void oa::Parser::onCTrapezoid(QIODevice& dataStream)
 {
-    CTrapezoid ctrapezoid;
+//     CTrapezoid ctrapezoid;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onCTrapezoid: read error");
@@ -1124,11 +1191,11 @@ void oa::Parser::onCTrapezoid(QIODevice& dataStream)
     default:
         break;
     }
-    ctrapezoid.m_layer = m_layer;
-    ctrapezoid.m_datatype = m_datatype;
-    ctrapezoid.m_type = m_ctrapezoidType;
-    ctrapezoid.m_width = m_geometryW;
-    ctrapezoid.m_height = m_geometryH;
+//     ctrapezoid.m_layer = m_layer;
+//     ctrapezoid.m_datatype = m_datatype;
+//     ctrapezoid.m_type = m_ctrapezoidType;
+//     ctrapezoid.m_width = m_geometryW;
+//     ctrapezoid.m_height = m_geometryH;
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned(dataStream);
         if (m_isXYRelative) {
@@ -1137,7 +1204,7 @@ void oa::Parser::onCTrapezoid(QIODevice& dataStream)
             m_geometryX = x;
         }
     }
-    ctrapezoid.m_x = m_geometryX;
+//     ctrapezoid.m_x = m_geometryX;
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
         if (m_isXYRelative) {
@@ -1146,17 +1213,18 @@ void oa::Parser::onCTrapezoid(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    ctrapezoid.m_y = m_geometryY;
+//     ctrapezoid.m_y = m_geometryY;
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        ctrapezoid.m_repetition = m_repetition;
+//         ctrapezoid.m_repetition = m_repetition;
     }
-    m_currentCell->m_ctrapezoids.append(ctrapezoid);
+//     m_currentCell->m_ctrapezoids.append(ctrapezoid);
 }
 
+// FIXME
 void oa::Parser::onCircle(QIODevice& dataStream)
 {
-    Circle circle;
+//     Circle circle;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onCircle: read error");
@@ -1179,9 +1247,9 @@ void oa::Parser::onCircle(QIODevice& dataStream)
             & m_modalVariableSetStatus.m_d.circleRadius)) {
         throw std::domain_error("onCircle: required modal variables not set");
     }
-    circle.m_layer = m_layer;
-    circle.m_datatype = m_datatype;
-    circle.m_radius = m_circleRadius;
+//     circle.m_layer = m_layer;
+//     circle.m_datatype = m_datatype;
+//     circle.m_radius = m_circleRadius;
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned(dataStream);
         if (m_isXYRelative) {
@@ -1190,7 +1258,7 @@ void oa::Parser::onCircle(QIODevice& dataStream)
             m_geometryX = x;
         }
     }
-    circle.m_x = m_geometryX;
+//     circle.m_x = m_geometryX;
 
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
@@ -1200,13 +1268,13 @@ void oa::Parser::onCircle(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    circle.m_y = m_geometryY;
+//     circle.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        circle.m_repetition = m_repetition;
+//         circle.m_repetition = m_repetition;
     }
-    m_currentCell->m_circles.append(circle);
+//     m_currentCell->m_circles.append(circle);
 }
 
 // TODO How to associate properties to elements
@@ -1328,6 +1396,12 @@ void oa::Parser::onXName(QIODevice& dataStream, int type)
         throw std::domain_error("Both Implicit and Explicit XName!");
     }
 
+    onUnsigned(dataStream);
+    onString(dataStream, N);
+    if (m_xNameMode == Explicit) {
+        onUnsigned(dataStream);
+    }
+    /*
     XName xname;
     xname.m_attribute = onUnsigned(dataStream);
     xname.m_string = onString(dataStream, N); // ABN
@@ -1338,29 +1412,35 @@ void oa::Parser::onXName(QIODevice& dataStream, int type)
         reference = m_xNameReference++;
     }
     m_layout.m_xNames[reference] = xname;
-
+    */
 }
 
 void oa::Parser::onXElement(QIODevice& dataStream)
 {
     //qInfo("onXElement");
     // Assert state Element
+    onUnsigned(dataStream);
+    onString(dataStream, N);
+    /**
     XELement xelement;
     xelement.m_attribute = onUnsigned(dataStream);
     xelement.m_string = onString(dataStream, B);
     m_currentCell->m_xelements.push_back(xelement);
+    **/
 }
 
+// FIXME one ut case
 void oa::Parser::onXGeometry(QIODevice& dataStream)
 {
     //qInfo("onXGeometry");
-    XGeometry xgeometry;
+//     XGeometry xgeometry;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onXGeometry: read error");
     }
     // 000XYRDL
-    xgeometry.m_attribute = onSigned(dataStream);
+//     xgeometry.m_attribute =
+    onSigned(dataStream);
     if (info & 1) { // L
         m_layer = onUnsigned(dataStream);
         m_modalVariableSetStatus.m_d.layer = 1;
@@ -1374,9 +1454,10 @@ void oa::Parser::onXGeometry(QIODevice& dataStream)
             & m_modalVariableSetStatus.m_d.datatype)) {
         throw std::domain_error("onXGeometry: required modal variables not set");
     }
-    xgeometry.m_layer = m_layer;
-    xgeometry.m_datatype = m_datatype;
-    xgeometry.m_string = onString(dataStream, B);
+//     xgeometry.m_layer = m_layer;
+//     xgeometry.m_datatype = m_datatype;
+//     xgeometry.m_string = onString(dataStream, B);
+    onString(dataStream, B);
 
     if ((info >> 4) & 1) { // X
         qint64 x = onSigned(dataStream);
@@ -1386,7 +1467,7 @@ void oa::Parser::onXGeometry(QIODevice& dataStream)
             m_geometryX = x;
         }
     }
-    xgeometry.m_x = m_geometryX;
+//     xgeometry.m_x = m_geometryX;
 
     if ((info >> 3) & 1) { // Y
         qint64 y = onSigned(dataStream);
@@ -1396,13 +1477,13 @@ void oa::Parser::onXGeometry(QIODevice& dataStream)
             m_geometryY = y;
         }
     }
-    xgeometry.m_y = m_geometryY;
+//     xgeometry.m_y = m_geometryY;
 
     if ((info >> 2) & 1) { // R
         onRepetition(dataStream);
-        xgeometry.m_repetition = m_repetition;
+//         xgeometry.m_repetition = m_repetition;
     }
-    m_currentCell->m_xgeometries.append(xgeometry);
+//     m_currentCell->m_xgeometries.append(xgeometry);
 }
 
 void oa::Parser::onCBlock(QIODevice& dataStream)
@@ -1585,98 +1666,172 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
     }
     case 1: {
         //qInfo("onRepetition1");
-        m_repetition.reset(new Repetition1(onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream)));
+        /*m_repetition.reset(new Repetition1(onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        int dx = onUnsigned(dataStream);
+        int dy = onUnsigned(dataStream);
+        int sx = onUnsigned(dataStream);
+        int sy = onUnsigned(dataStream);
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = (dx + 2) * (dy + 2);
+        for (int i = 0; i < dx + 2; ++i) {
+            for (int j = 0; j < dy + 2; ++j) {
+                m_layout.m_repetitions.append(oa::DeltaValue(sx * i, sy * j));
+            }
+        }
         break;
     }
     case 2: {
         //qInfo("onRepetition2");
-        m_repetition.reset(new Repetition2(onUnsigned(dataStream), onUnsigned(dataStream)));
+        /*m_repetition.reset(new Repetition2(onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        int dx = onUnsigned(dataStream);
+        int sx = onUnsigned(dataStream);
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        for (int i = 0; i < dx + 2; ++i) {
+            m_layout.m_repetitions.append(oa::DeltaValue(sx * i, 0));
+        }
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = dx + 2;
         break;
     }
     case 3: {
         //qInfo("onRepetition3");
-        m_repetition.reset(new Repetition3(onUnsigned(dataStream), onUnsigned(dataStream)));
+        /*m_repetition.reset(new Repetition3(onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        int dy = onUnsigned(dataStream);
+        int sy = onUnsigned(dataStream);
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        for (int i = 0; i < dy + 2; ++i) {
+            m_layout.m_repetitions.append(oa::DeltaValue(0, sy * i));
+        }
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = dy + 2;
         break;
     }
     case 4: {
         //qInfo("onRepetition4");
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dx = onUnsigned(dataStream);
-        QVector<quint32> sxz;
-        for (quint64 i = 0; i <= dx; ++i) {
-            sxz << onUnsigned(dataStream);
+        m_repetitionCount = dx + 2;
+        quint32 s = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(s, 0));
+        for (quint64 i = 0; i < dx + 1; ++i) {
+            s += onUnsigned(dataStream);
+            m_layout.m_repetitions.append(oa::DeltaValue(s, 0));
         }
-        m_repetition.reset(new Repetition4(dx, sxz));
+//         m_repetition.reset(new Repetition4(dx, sxz));
         break;
     }
     case 5: {
         //qInfo("onRepetition5");
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dx = onUnsigned(dataStream); // n - 2
         quint64 g = onUnsigned(dataStream);
-        QVector<quint32> sxz;
-        for (quint64 i = 0; i <= dx; ++i) {
-            sxz << onUnsigned(dataStream);
+        m_repetitionCount = dx + 2;
+        quint32 s = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(s, 0));
+        for (quint64 i = 0; i < dx + 1; ++i) {
+            s += onUnsigned(dataStream);
+            m_layout.m_repetitions.append(oa::DeltaValue(s * g, 0));
         }
-        m_repetition.reset(new Repetition5(dx, g, sxz));
+//         m_repetition.reset(new Repetition5(dx, g, sxz));
         break;
     }
     case 6: {
         //qInfo("onRepetition6");
-        quint64 dy = onUnsigned(dataStream); // n - 2
-        QVector<quint32> syz;
-        for (quint64 i = 0; i <= dy; ++i) {
-            syz << onUnsigned(dataStream);
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        quint64 dy = onUnsigned(dataStream);
+        m_repetitionCount = dy + 2;
+        quint32 s = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(0, s));
+        for (quint64 i = 0; i < dy + 1; ++i) {
+            s += onUnsigned(dataStream);
+            m_layout.m_repetitions.append(oa::DeltaValue(0, s));
         }
-        m_repetition.reset(new Repetition6(dy, syz));
+//         m_repetition.reset(new Repetition6(dy, syz));
         break;
     }
     case 7: {
         //qInfo("onRepetition7");
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dy = onUnsigned(dataStream); // n - 2
         quint64 g = onUnsigned(dataStream);
-        QVector<quint32> syz;
-        for (quint64 i = 0; i <= dy; ++i) {
-            syz << onUnsigned(dataStream);
+        m_repetitionCount = dy + 2;
+        quint32 s = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(0, s));
+        for (quint64 i = 0; i < dy + 1; ++i) {
+            s += onUnsigned(dataStream);
+            m_layout.m_repetitions.append(oa::DeltaValue(0, s * g));
         }
-        m_repetition.reset(new Repetition7(dy, g, syz));
+//         m_repetition.reset(new Repetition7(dy, g, syz));
         break;
     }
     case 8: {
         //qInfo("onRepetition8");
         quint64 dn = onUnsigned(dataStream);
         quint64 dm = onUnsigned(dataStream);
-        DeltaG pn = onDeltaG(dataStream);
-        DeltaG pm = onDeltaG(dataStream);
-        m_repetition.reset(new Repetition8(dn, dm, pn.value, pm.value));
+        oa::DeltaValue pn = onDeltaG(dataStream).value;
+        oa::DeltaValue pm = onDeltaG(dataStream).value;
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = (dn + 2) * (dm + 2);
+        for (quint64 i = 0; i < dn + 2; ++i) {
+            for (quint64 j = 0; j < dm + 2; ++j) {
+                m_layout.m_repetitions.append(oa::DeltaValue(i * pn.m_x + j * pm.m_x, i * pn.m_y + j * pm.m_y));
+            }
+        }
+//         m_repetition.reset(new Repetition8(dn, dm, pn.value, pm.value));
         break;
     }
     case 9: {
         //qInfo("onRepetition9");
         quint64 d = onUnsigned(dataStream);
-        DeltaG p = onDeltaG(dataStream);
-        m_repetition.reset(new Repetition9(d, p.value));
+        oa::DeltaValue p = onDeltaG(dataStream).value;
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = d + 2;
+        for (quint64 i = 0; i < d + 2; ++i) {
+            m_layout.m_repetitions.append(oa::DeltaValue(i * p.m_x, i * p.m_y));
+        }
+//         m_repetition.reset(new Repetition9(d, p.value));
         break;
     }
     case 10: {
         //qInfo("onRepetition10");
         quint64 d = onUnsigned(dataStream); // p - 2
-        QVector<DeltaValue> pz;
-        for (quint64 i = 0; i <= d; ++i) {
-            DeltaG p = onDeltaG(dataStream);
-            pz << p.value;
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = d + 2;
+        qint32 sx = 0, sy = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(0, 0));
+        for (quint64 i = 0; i < d + 1; ++i) {
+            oa::DeltaValue p = onDeltaG(dataStream).value;
+            sx += p.m_x;
+            sy += p.m_y;
+            m_layout.m_repetitions.append(oa::DeltaValue(p.m_x, p.m_y));
         }
-        m_repetition.reset(new Repetition10(d, pz));
+//         m_repetition.reset(new Repetition10(d, pz));
         break;
     }
     case 11: {
         //qInfo("onRepetition11");
         quint64 d = onUnsigned(dataStream); // p - 2
         quint64 g = onUnsigned(dataStream); // grid;
-        QVector<DeltaValue> pz;
-        for (quint64 i = 0; i <= d; ++i) {
-            DeltaG p = onDeltaG(dataStream);
-            pz << p.value;
+        m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = d + 2;
+        qint32 sx = 0, sy = 0;
+        m_layout.m_repetitions.append(oa::DeltaValue(0, 0));
+        for (quint64 i = 0; i < d + 1; ++i) {
+            oa::DeltaValue p = onDeltaG(dataStream).value;
+            sx += p.m_x;
+            sy += p.m_y;
+            m_layout.m_repetitions.append(oa::DeltaValue(sx * g, sy * g));
         }
-        m_repetition.reset(new Repetition11(d, g, pz));
+//         m_repetition.reset(new Repetition11(d, g, pz));
         break;
     }
     default:
@@ -1689,9 +1844,8 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
 {
     quint8 type = onUnsigned(dataStream);
     quint64 count = onUnsigned(dataStream);
-    QSharedPointer<PointList> pointList(new PointList);
 
-    PointList &pl = *pointList;
+    PointList pl;
     switch (type) {
     case 0:
     case 1: {
@@ -1759,10 +1913,14 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         break;
     }
     if (isPolygon) {
-        m_polygonPointList = pointList;
+        m_polygonPointListOffset = m_layout.m_vertexes.size();
+        m_polygonPointListCount = pl.size();
+        m_layout.m_vertexes.append(pl);
         m_modalVariableSetStatus.m_d.polygonPointList = 1;
     } else {
-        m_pointList = pointList;
+        m_pointListOffset = m_layout.m_vertexes.size();
+        m_pointListCount = pl.size();
+        m_layout.m_vertexes.append(pl);
         m_modalVariableSetStatus.m_d.pathPointList = 1;
     }
 }
@@ -1802,9 +1960,15 @@ void oa::Parser::undefineModalVariables()
     m_textY = 0;
     m_isXYRelative = false;
     m_modalVariableSetStatus.m_dummy = 0;
-    m_repetition.clear();
-    m_polygonPointList.clear();
-    m_pointList.clear();
+//     m_repetition.clear();
+//     m_polygonPointList.clear();
+//     m_pointList.clear();
     m_lastValuesList.clear();
+    m_repetitionOffset = -1;
+    m_repetitionCount = -1;
+    m_polygonPointListOffset = -1;
+    m_polygonPointListCount = -1;
+    m_pointListOffset = -1;
+    m_pointListCount = -1;
 }
 
