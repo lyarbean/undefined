@@ -3,6 +3,10 @@
 #include <QVector>
 #include <QMap>
 #include <QString>
+#include <QOpenGLExtraFunctions>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLVertexArrayObject>
+#include <QOpenGLBuffer>
 namespace oa {
 // m_drawType is
 // case Rectangle | Trapezoid | CTrapezoid => GL_TRIANGLES;
@@ -12,25 +16,23 @@ namespace oa {
 // TODO convert Circle to Polygon
 
 struct Mesh {
-    quint32 m_layer;
-    quint32 m_datatype;
-    qint16 m_oasisType;
-    qint16 m_drawType; // GL_TRIANGLES
-    qint32 m_baseVertex;
-    qint32 m_vertexCount;
-    qint32 m_baseIndex;
-    // Need dynamic bind
-    // PointList m_repetition; // put to m_repetitionsBuffer := {{0,0}, ...}
-    qint32 m_repetitionOffset;
-    qint32 m_repetitionCount;
-    qint32 m_instanceCount;   // m_repetition.size()
-    qint32 m_materialIndex;
+    quint32 m_layer = 0;
+    quint32 m_datatype = 0;
+    qint16 m_oasisType = 0;
+    qint16 m_drawType = 0; // GL_TRIANGLES
+    qint32 m_baseVertex = 0;
+    qint32 m_vertexCount = 0;
+    qint32 m_baseIndex = -1;
+    qint32 m_repetitionOffset = -1;
+    qint32 m_repetitionCount = 0;
+    qint32 m_instanceCount = 0;   // m_repetition.size()
+    qint32 m_materialIndex = -1;
 };
 struct Text {
     QString m_string;
     quint32 m_textLayer;
     quint32 m_textType;
-    qint64 m_x, m_y;
+    qint32 m_x, m_y;
     qint32 m_repetitionOffset;
     qint32 m_repetitionCount;
 };
@@ -56,14 +58,14 @@ struct Cell {
 };
 
 struct DeltaValue {
-    DeltaValue(qint64 x = 0, qint64 y = 0) : m_x(x), m_y(y) {}
+    DeltaValue(qint32 x = 0, qint32 y = 0) : m_x(x), m_y(y) {}
     DeltaValue& operator+=(const DeltaValue &that) {
         this->m_x += that.m_x;
         this->m_y += that.m_y;
         return *this;
     }
-    qint64 m_x;
-    qint64 m_y;
+    qint32 m_x;
+    qint32 m_y;
 };
 
 struct Delta23 {
@@ -73,18 +75,26 @@ struct Delta23 {
 
 struct DeltaG {
     DeltaG(quint64 magnitude = 0);
-    DeltaG(qint64 x = 0, qint64 y = 0);
+    DeltaG(qint32 x = 0, qint32 y = 0);
     DeltaValue value;
 };
 
 // TODO not deltas
 using PointList = QVector<DeltaValue>;
 
-using IntervalType = QPair<quint64, quint64>;
-class Layout {
+using IntervalType = QPair<quint32, quint32>;
+class Layout  : public QOpenGLExtraFunctions {
 public:
-    Layout() : m_unit(1) {}
+    Layout() : m_unit(1) {
+        m_vbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_tbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_ibo = new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
+    }
+    void initializeRender();
     void render(); // TODO pass World matrix
+    void render(Cell *cell, QVector<Placement::X>& matrixes);
+    void render(const Placement& placement);
+    void render(const Mesh& mesh);
 //     void put();
     qreal m_unit;
     QMap<quint32, QString> m_textStrings;
@@ -97,13 +107,21 @@ public:
         QString m_name;
         Cell* m_cell;
     };
-    QMap<qint64, NamedCell> m_cells;
+    QMap<qint32, NamedCell> m_cells;
     // auto cell = m_cells[m_cellNameToReference[cellname]];
-    QMap<QString, qint64> m_cellNameToReference;
+    QMap<QString, qint32> m_cellNameToReference;
     // Buffers
     // Vertex
     PointList m_repetitions;
     PointList m_vertexes;
+    QOpenGLShaderProgram m_program;
+    QOpenGLVertexArrayObject m_vao;
+    // type : GL_ARRAY_BUFFER => VertexBuffer
+    QOpenGLBuffer* m_vbo;
+    // type : GL_ARRAY_BUFFER => VertexBuffer
+    QOpenGLBuffer* m_tbo;
+    // type : GL_ELEMENT_ARRAY_BUFFER => IndexBuffer
+    QOpenGLBuffer* m_ibo;
 };
 
 }

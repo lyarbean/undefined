@@ -1665,8 +1665,7 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
         break;
     }
     case 1: {
-        //qInfo("onRepetition1");
-        /*m_repetition.reset(new Repetition1(onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        qInfo("onRepetition1");
         int dx = onUnsigned(dataStream);
         int dy = onUnsigned(dataStream);
         int sx = onUnsigned(dataStream);
@@ -1682,33 +1681,32 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
         break;
     }
     case 2: {
-        //qInfo("onRepetition2");
-        /*m_repetition.reset(new Repetition2(onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        qInfo("onRepetition2");
         int dx = onUnsigned(dataStream);
         int sx = onUnsigned(dataStream);
         m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = dx + 2;
         for (int i = 0; i < dx + 2; ++i) {
             m_layout.m_repetitions.append(oa::DeltaValue(sx * i, 0));
         }
-        m_modalVariableSetStatus.m_d.repetition = 1;
-        m_repetitionCount = dx + 2;
+
         break;
     }
     case 3: {
-        //qInfo("onRepetition3");
-        /*m_repetition.reset(new Repetition3(onUnsigned(dataStream), onUnsigned(dataStream)))*/;
+        qInfo("onRepetition3");
         int dy = onUnsigned(dataStream);
         int sy = onUnsigned(dataStream);
         m_repetitionOffset = m_layout.m_repetitions.size();
+        m_modalVariableSetStatus.m_d.repetition = 1;
+        m_repetitionCount = dy + 2;
         for (int i = 0; i < dy + 2; ++i) {
             m_layout.m_repetitions.append(oa::DeltaValue(0, sy * i));
         }
-        m_modalVariableSetStatus.m_d.repetition = 1;
-        m_repetitionCount = dy + 2;
         break;
     }
     case 4: {
-        //qInfo("onRepetition4");
+        qInfo("onRepetition4");
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dx = onUnsigned(dataStream);
@@ -1719,11 +1717,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             s += onUnsigned(dataStream);
             m_layout.m_repetitions.append(oa::DeltaValue(s, 0));
         }
-//         m_repetition.reset(new Repetition4(dx, sxz));
         break;
     }
     case 5: {
-        //qInfo("onRepetition5");
+        qInfo("onRepetition5");
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dx = onUnsigned(dataStream); // n - 2
@@ -1735,11 +1732,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             s += onUnsigned(dataStream);
             m_layout.m_repetitions.append(oa::DeltaValue(s * g, 0));
         }
-//         m_repetition.reset(new Repetition5(dx, g, sxz));
         break;
     }
     case 6: {
-        //qInfo("onRepetition6");
+        qInfo("onRepetition6");
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dy = onUnsigned(dataStream);
@@ -1750,11 +1746,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             s += onUnsigned(dataStream);
             m_layout.m_repetitions.append(oa::DeltaValue(0, s));
         }
-//         m_repetition.reset(new Repetition6(dy, syz));
         break;
     }
     case 7: {
-        //qInfo("onRepetition7");
+        qInfo("onRepetition7");
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
         quint64 dy = onUnsigned(dataStream); // n - 2
@@ -1766,11 +1761,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             s += onUnsigned(dataStream);
             m_layout.m_repetitions.append(oa::DeltaValue(0, s * g));
         }
-//         m_repetition.reset(new Repetition7(dy, g, syz));
         break;
     }
     case 8: {
-        //qInfo("onRepetition8");
+        qInfo("onRepetition8");
         quint64 dn = onUnsigned(dataStream);
         quint64 dm = onUnsigned(dataStream);
         oa::DeltaValue pn = onDeltaG(dataStream).value;
@@ -1783,11 +1777,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
                 m_layout.m_repetitions.append(oa::DeltaValue(i * pn.m_x + j * pm.m_x, i * pn.m_y + j * pm.m_y));
             }
         }
-//         m_repetition.reset(new Repetition8(dn, dm, pn.value, pm.value));
         break;
     }
     case 9: {
-        //qInfo("onRepetition9");
+        qInfo("onRepetition9");
         quint64 d = onUnsigned(dataStream);
         oa::DeltaValue p = onDeltaG(dataStream).value;
         m_repetitionOffset = m_layout.m_repetitions.size();
@@ -1796,11 +1789,10 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
         for (quint64 i = 0; i < d + 2; ++i) {
             m_layout.m_repetitions.append(oa::DeltaValue(i * p.m_x, i * p.m_y));
         }
-//         m_repetition.reset(new Repetition9(d, p.value));
         break;
     }
     case 10: {
-        //qInfo("onRepetition10");
+        qInfo("onRepetition10");
         quint64 d = onUnsigned(dataStream); // p - 2
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
@@ -1811,13 +1803,12 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             oa::DeltaValue p = onDeltaG(dataStream).value;
             sx += p.m_x;
             sy += p.m_y;
-            m_layout.m_repetitions.append(oa::DeltaValue(p.m_x, p.m_y));
+            m_layout.m_repetitions.append(oa::DeltaValue(sx, sy));
         }
-//         m_repetition.reset(new Repetition10(d, pz));
         break;
     }
     case 11: {
-        //qInfo("onRepetition11");
+        qInfo("onRepetition11");
         quint64 d = onUnsigned(dataStream); // p - 2
         quint64 g = onUnsigned(dataStream); // grid;
         m_repetitionOffset = m_layout.m_repetitions.size();
@@ -1831,7 +1822,6 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
             sy += p.m_y;
             m_layout.m_repetitions.append(oa::DeltaValue(sx * g, sy * g));
         }
-//         m_repetition.reset(new Repetition11(d, g, pz));
         break;
     }
     default:
@@ -1930,11 +1920,11 @@ oa::IntervalType oa::Parser::onInterval(QIODevice& dataStream)
     quint8 type = onUnsigned(dataStream);
     switch (type) {
     case 0:
-        return IntervalType {0,  1UL << 63};
+        return IntervalType {0,  1U << 31};
     case 1:
         return IntervalType {0, onUnsigned(dataStream)};
     case 2:
-        return IntervalType {onUnsigned(dataStream), 1UL << 63};
+        return IntervalType {onUnsigned(dataStream), 1U << 31};
     case 3: {
         quint64 b = onUnsigned(dataStream);
         return IntervalType {b, b};
