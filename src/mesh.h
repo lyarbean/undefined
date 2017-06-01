@@ -1,4 +1,4 @@
-#ifndef MESH_H
+﻿#ifndef MESH_H
 #define MESH_H
 #include <QVector>
 #include <QMap>
@@ -7,6 +7,8 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
+//#include <QOpenGLFunctions_3_2_Compatibility> 
+#include <QOpenGLFunctions_3_2_Core>
 namespace oa {
 // m_drawType is
 // case Rectangle | Trapezoid | CTrapezoid => GL_TRIANGLES;
@@ -23,8 +25,8 @@ struct Mesh {
     qint32 m_baseVertex = 0;
     qint32 m_vertexCount = 0;
     qint32 m_baseIndex = -1;
-    qint32 m_repetitionOffset = -1;
-    qint32 m_repetitionCount = 0;
+    qint32 m_repetitionOffset = 0;
+    qint32 m_repetitionCount = 1;
     qint32 m_instanceCount = 0;   // m_repetition.size()
     qint32 m_materialIndex = -1;
 };
@@ -95,6 +97,8 @@ public:
     void render(Cell *cell, QVector<Placement::X>& matrixes);
     void render(const Placement& placement);
     void render(const Mesh& mesh);
+	void bindData();
+	bool reportGlError(const QString &tag);
 //     void put();
     qreal m_unit;
     QMap<quint32, QString> m_textStrings;

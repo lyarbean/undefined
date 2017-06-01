@@ -27,7 +27,7 @@ src/mesh.cpp
 src/parser.cpp)
 
 add_library(parser ${parser_SRC})
-target_link_libraries(parser Qt5::Core Qt5::Gui)
+target_link_libraries(parser Qt5::Core Qt5::Gui -lGL)
 
 enable_testing()
 add_subdirectory(ut)

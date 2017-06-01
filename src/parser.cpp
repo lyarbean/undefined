@@ -1,4 +1,4 @@
-#include <GL/gl.h>
+﻿#include <GL/gl.h>
 /*
  * <one line to give the program's name and a brief idea of what it does.>
  * Copyright 2015  颜烈彬 <slbyan@gmail.com>
@@ -43,7 +43,7 @@ oa::Parser::Parser(Layout &layout)
       m_propNameReference(0),
       m_propStringReference(0),
       m_xNameReference(0),
-      m_repetitionOffset(-1),
+      m_repetitionOffset(0),
       m_repetitionCount(0),
       m_polygonPointListOffset(-1),
       m_polygonPointListCount(-1),
@@ -347,7 +347,7 @@ void oa::Parser::onPad(QIODevice& dataStream)
 // TODO CRC
 void oa::Parser::onEnd(QIODevice& dataStream)
 {
-    //qInfo("onEnd");
+    qInfo("onEnd");
     if (m_offsetFlag) {
         for (int i = 0; i < 12; ++i) {
             m_tableOffsets << onUnsigned(dataStream);
@@ -382,7 +382,7 @@ void oa::Parser::onEnd(QIODevice& dataStream)
 
 void oa::Parser::onCellName(QIODevice& dataStream, int type)
 {
-    //qInfo("onCellName");
+    qInfo("onCellName");
     QString name = onString(dataStream, N);
     if (m_cellNameMode == Default) {
         if (type == 3) {
@@ -440,7 +440,7 @@ void oa::Parser::onCellName(QIODevice& dataStream, int type)
 
 void oa::Parser::onTextString(QIODevice& dataStream, int type)
 {
-    //qInfo("onTextString");
+    qInfo("onTextString");
     QString name = onString(dataStream, N);
     if (m_textStringMode == Default) {
         if (type == 5) {
@@ -482,7 +482,7 @@ void oa::Parser::onTextString(QIODevice& dataStream, int type)
 
 void oa::Parser::onPropName(QIODevice& dataStream, int type)
 {
-    //qInfo("onPropName");
+    qInfo("onPropName");
     QString name = onString(dataStream, N);
     if (m_propNameMode == Default) {
         if (type == 7) {
@@ -517,7 +517,7 @@ void oa::Parser::onPropName(QIODevice& dataStream, int type)
 
 void oa::Parser::onPropString(QIODevice& dataStream, int type)
 {
-    //qInfo("onPropString");
+    qInfo("onPropString");
     QString name = onString(dataStream, B);
     if (m_propStringMode == Default) {
         if (type == 9) {
@@ -543,7 +543,7 @@ void oa::Parser::onPropString(QIODevice& dataStream, int type)
 
 void oa::Parser::onLayerName(QIODevice& dataStream, int type)
 {
-    //qInfo("onLayerName");
+    qInfo("onLayerName");
     QString name = onString(dataStream, N);
     IntervalType layerInterval = onInterval(dataStream);
     IntervalType datatypeInterval = onInterval(dataStream);
@@ -558,7 +558,7 @@ void oa::Parser::onLayerName(QIODevice& dataStream, int type)
 
 void oa::Parser::onCell(QIODevice& dataStream, int type)
 {
-    //qInfo("onCell");
+    qInfo("onCell");
     // QSharedPointer<Cell> cell(new Cell);
     m_currentCell = new Cell;
     if (type == 13) {
@@ -607,19 +607,19 @@ void oa::Parser::onCell(QIODevice& dataStream, int type)
 
 void oa::Parser::onXYAbsolute()
 {
-    //qInfo("onXYAbsolute");
+    qInfo("onXYAbsolute");
     m_isXYRelative = false;
 }
 
 void oa::Parser::onXYRelative()
 {
-    //qInfo("onXYRelative");
+    qInfo("onXYRelative");
     m_isXYRelative = true;
 }
 
 void oa::Parser::onPlacement(QIODevice& dataStream, int type)
 {
-    //qInfo("onPlacement");
+    qInfo("onPlacement");
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onPlacement: read error");
@@ -716,7 +716,7 @@ void oa::Parser::onPlacement(QIODevice& dataStream, int type)
 
 void oa::Parser::onText(QIODevice& dataStream)
 {
-    //qInfo("onText");
+    qInfo("onText");
     Text text;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
@@ -789,7 +789,7 @@ void oa::Parser::onText(QIODevice& dataStream)
 
 void oa::Parser::onRectangle(QIODevice& dataStream)
 {
-    //qInfo("onRectangle");
+    qInfo("onRectangle");
     // Rectangle rectangle;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
@@ -869,7 +869,7 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
 
 void oa::Parser::onPolygon(QIODevice& dataStream)
 {
-    //qInfo("onPolygon");
+    qInfo("onPolygon");
 //     Polygon polygon;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
@@ -941,7 +941,7 @@ void oa::Parser::onPolygon(QIODevice& dataStream)
 
 void oa::Parser::onPath(QIODevice& dataStream)
 {
-    //qInfo("onPath");
+    qInfo("onPath");
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
         throw std::domain_error("onPath: read error");
@@ -1281,7 +1281,7 @@ void oa::Parser::onCircle(QIODevice& dataStream)
 // If no m_currentCell set, then this property applies to the whole layout
 void oa::Parser::onProperty(QIODevice& dataStream, int type)
 {
-    //qInfo("onProperty");
+    qInfo("onProperty");
     if (type == 29) {
         if (!m_modalVariableSetStatus.m_d.lastPropertyName) {
             throw std::domain_error("onProperty: type 29, but lastPropertyName is not set");
@@ -1384,7 +1384,7 @@ void oa::Parser::onProperty(QIODevice& dataStream, int type)
 
 void oa::Parser::onXName(QIODevice& dataStream, int type)
 {
-    //qInfo("onXName");
+    qInfo("onXName");
     if (m_xNameMode == Default) {
         if (type == 30) {
             m_xNameMode = Implicit;
@@ -1417,7 +1417,7 @@ void oa::Parser::onXName(QIODevice& dataStream, int type)
 
 void oa::Parser::onXElement(QIODevice& dataStream)
 {
-    //qInfo("onXElement");
+    qInfo("onXElement");
     // Assert state Element
     onUnsigned(dataStream);
     onString(dataStream, N);
@@ -1432,7 +1432,7 @@ void oa::Parser::onXElement(QIODevice& dataStream)
 // FIXME one ut case
 void oa::Parser::onXGeometry(QIODevice& dataStream)
 {
-    //qInfo("onXGeometry");
+    qInfo("onXGeometry");
 //     XGeometry xgeometry;
     quint8 info = 0;
     if (dataStream.read((char *) &info, 1) != 1) {
@@ -1488,7 +1488,7 @@ void oa::Parser::onXGeometry(QIODevice& dataStream)
 
 void oa::Parser::onCBlock(QIODevice& dataStream)
 {
-    //qInfo("onCBlock");
+    qInfo("onCBlock");
     quint64 comType = onUnsigned(dataStream);
     quint64 uncomByteCount = onUnsigned(dataStream);
     quint64 comByteCount = onUnsigned(dataStream);
@@ -1902,6 +1902,10 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         throw std::domain_error("invalid PointList");
         break;
     }
+	if (pl.isEmpty())
+	{
+        throw std::domain_error("invalid PointList");
+	}
     if (isPolygon) {
         m_polygonPointListOffset = m_layout.m_vertexes.size();
         m_polygonPointListCount = pl.size();
@@ -1954,8 +1958,10 @@ void oa::Parser::undefineModalVariables()
 //     m_polygonPointList.clear();
 //     m_pointList.clear();
     m_lastValuesList.clear();
-    m_repetitionOffset = -1;
-    m_repetitionCount = -1;
+	m_layout.m_repetitions.clear();
+	m_layout.m_repetitions.push_back({0,0});
+    m_repetitionOffset = 0;
+    m_repetitionCount = 1;
     m_polygonPointListOffset = -1;
     m_polygonPointListCount = -1;
     m_pointListOffset = -1;
