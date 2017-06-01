@@ -3,12 +3,11 @@
 #include <QVector>
 #include <QMap>
 #include <QString>
+#include <QTransform> 
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLBuffer>
-//#include <QOpenGLFunctions_3_2_Compatibility> 
-#include <QOpenGLFunctions_3_2_Core>
 namespace oa {
 // m_drawType is
 // case Rectangle | Trapezoid | CTrapezoid => GL_TRIANGLES;
@@ -29,6 +28,8 @@ struct Mesh {
     qint32 m_repetitionCount = 1;
     qint32 m_instanceCount = 0;   // m_repetition.size()
     qint32 m_materialIndex = -1;
+    float m_x = 0;
+    float m_y = 0;
 };
 struct Text {
     QString m_string;
@@ -47,10 +48,9 @@ struct Placement {
     // x20 = x + x_r
     // x21 = y + x_r
     // f =  -1 ** (F mod 2)
-    struct X {
-        qint32 x00, x01, x10, x11, x20, x21;
-    };
-    QVector<X> m_matrixes;
+    float m_x00, m_x01, m_x10, m_x11, m_x20, m_x21;
+    qint32 m_repetitionOffset = 0;
+    qint32 m_repetitionCount = 1;
 };
 struct Cell {
     Cell() = default;
@@ -66,8 +66,10 @@ struct DeltaValue {
         this->m_y += that.m_y;
         return *this;
     }
-    qint32 m_x;
-    qint32 m_y;
+	float m_x;
+	float m_y;
+    //qint32 m_x;
+    //qint32 m_y;
 };
 
 struct Delta23 {
@@ -85,7 +87,7 @@ struct DeltaG {
 using PointList = QVector<DeltaValue>;
 
 using IntervalType = QPair<quint32, quint32>;
-class Layout  : public QOpenGLExtraFunctions {
+class Layout : public QOpenGLExtraFunctions {
 public:
     Layout() : m_unit(1) {
         m_vbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
@@ -93,10 +95,9 @@ public:
         m_ibo = new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
     }
     void initializeRender();
-    void render(); // TODO pass World matrix
-    void render(Cell *cell, QVector<Placement::X>& matrixes);
-    void render(const Placement& placement);
-    void render(const Mesh& mesh);
+    void render(const QTransform& map = QTransform()); // TODO pass World matrix
+    void render(const Placement& placement, const QTransform& map = QTransform());
+    void render(const Mesh& mesh, const QTransform& map = QTransform());
 	void bindData();
 	bool reportGlError(const QString &tag);
 //     void put();

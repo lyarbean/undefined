@@ -78,7 +78,7 @@ bool oa::Parser::open(const QString &filename)
     return r;
 }
 
-bool oa::Parser::parse(QIODevice& dataStream)
+bool oa::Parser::parse(QIODevice &dataStream)
 {
     // Handle START and END first
     beginStart(dataStream);
@@ -128,7 +128,7 @@ bool oa::Parser::parse(QIODevice& dataStream)
     return false; // No END read
 }
 
-void oa::Parser::beginStart(QIODevice& dataStream)
+void oa::Parser::beginStart(QIODevice &dataStream)
 {
     quint8 type = onUnsigned(dataStream);
     if (type != 1) {
@@ -138,7 +138,7 @@ void oa::Parser::beginStart(QIODevice& dataStream)
 }
 
 
-void oa::Parser::nextRecord(QIODevice& dataStream)
+void oa::Parser::nextRecord(QIODevice &dataStream)
 {
     quint64 type = onUnsigned(dataStream);
     switch (type) {
@@ -223,7 +223,7 @@ void oa::Parser::nextRecord(QIODevice& dataStream)
         throw std::domain_error(QString("nextRecord: unintended type:%1").arg(type).toStdString());
     }
 }
-void oa::Parser::onStart(QIODevice& dataStream)
+void oa::Parser::onStart(QIODevice &dataStream)
 {
     QString version = onString(dataStream, N);
     if (version != "1.0") {
@@ -249,7 +249,7 @@ void oa::Parser::onStart(QIODevice& dataStream)
 }
 
 
-void oa::Parser:: readTableOffsets(QIODevice& dataStream)
+void oa::Parser:: readTableOffsets(QIODevice &dataStream)
 {
     quint32 cellnameOffset, textstringOffset, propnameOffset, propstringOffset, layernameOffset, xnameOffset;
     cellnameOffset = m_tableOffsets.at(1);
@@ -339,13 +339,13 @@ void oa::Parser:: readTableOffsets(QIODevice& dataStream)
     }
 }
 
-void oa::Parser::onPad(QIODevice& dataStream)
+void oa::Parser::onPad(QIODevice &dataStream)
 {
     return;
 }
 
 // TODO CRC
-void oa::Parser::onEnd(QIODevice& dataStream)
+void oa::Parser::onEnd(QIODevice &dataStream)
 {
     qInfo("onEnd");
     if (m_offsetFlag) {
@@ -380,7 +380,7 @@ void oa::Parser::onEnd(QIODevice& dataStream)
     }
 }
 
-void oa::Parser::onCellName(QIODevice& dataStream, int type)
+void oa::Parser::onCellName(QIODevice &dataStream, int type)
 {
     qInfo("onCellName");
     QString name = onString(dataStream, N);
@@ -423,7 +423,8 @@ void oa::Parser::onCellName(QIODevice& dataStream, int type)
                     p.m_cellName = name;
                 }
 
-        }            }
+            }
+        }
         if (m_textString == unresolved) {
             m_textString = name;
         }
@@ -438,7 +439,7 @@ void oa::Parser::onCellName(QIODevice& dataStream, int type)
     // TODO try to handle cell properties immediately if we care
 }
 
-void oa::Parser::onTextString(QIODevice& dataStream, int type)
+void oa::Parser::onTextString(QIODevice &dataStream, int type)
 {
     qInfo("onTextString");
     QString name = onString(dataStream, N);
@@ -480,7 +481,7 @@ void oa::Parser::onTextString(QIODevice& dataStream, int type)
     }
 }
 
-void oa::Parser::onPropName(QIODevice& dataStream, int type)
+void oa::Parser::onPropName(QIODevice &dataStream, int type)
 {
     qInfo("onPropName");
     QString name = onString(dataStream, N);
@@ -515,7 +516,7 @@ void oa::Parser::onPropName(QIODevice& dataStream, int type)
     }
 }
 
-void oa::Parser::onPropString(QIODevice& dataStream, int type)
+void oa::Parser::onPropString(QIODevice &dataStream, int type)
 {
     qInfo("onPropString");
     QString name = onString(dataStream, B);
@@ -541,7 +542,7 @@ void oa::Parser::onPropString(QIODevice& dataStream, int type)
     m_layout.m_propStrings.insert(reference, name);
 }
 
-void oa::Parser::onLayerName(QIODevice& dataStream, int type)
+void oa::Parser::onLayerName(QIODevice &dataStream, int type)
 {
     qInfo("onLayerName");
     QString name = onString(dataStream, N);
@@ -556,7 +557,7 @@ void oa::Parser::onLayerName(QIODevice& dataStream, int type)
     }
 }
 
-void oa::Parser::onCell(QIODevice& dataStream, int type)
+void oa::Parser::onCell(QIODevice &dataStream, int type)
 {
     qInfo("onCell");
     // QSharedPointer<Cell> cell(new Cell);
@@ -617,7 +618,7 @@ void oa::Parser::onXYRelative()
     m_isXYRelative = true;
 }
 
-void oa::Parser::onPlacement(QIODevice& dataStream, int type)
+void oa::Parser::onPlacement(QIODevice &dataStream, int type)
 {
     qInfo("onPlacement");
     quint8 info = 0;
@@ -691,30 +692,22 @@ void oa::Parser::onPlacement(QIODevice& dataStream, int type)
 
     if ((info >> 3) & 1) { // R
         onRepetition(dataStream);
-        //  placement.m_repetition = m_repetition;
+        placement.m_repetitionOffset = m_repetitionOffset;
+        placement.m_repetitionCount = m_repetitionCount;
     }
     //FIXME if no repetition
     qint32 flip = (info & 0b1) ? -1 : 1;
-    qint32 x00 = cos(angle/90) * mag;
-    qint32 x01 = sin(angle/90) * mag;
-    qint32 x10 = -flip * x01;
-    qint32 x11 = flip * x00;
-    for (auto i = 0; i < m_repetitionCount; ++i)
-    {
-        Placement::X p;
-        p.x00 = x00;
-        p.x01 = x01;
-        p.x10 = x10;
-        p.x11 = x11;
-        p.x20 = m_placementX + m_layout.m_repetitions[m_repetitionOffset + i].m_x;
-        p.x21 = m_placementY + m_layout.m_repetitions[m_repetitionOffset + i].m_y;
-        placement.m_matrixes.append(p);
-    }
+    placement.m_x00 = cos(angle / 90) * mag;
+    placement.m_x01 = sin(angle / 90) * mag;
+    placement.m_x10 = -flip * placement.m_x01;
+    placement.m_x11 = flip * placement.m_x00;
+    placement.m_x20 = m_placementX;
+    placement.m_x21 = m_placementY;
     m_currentCell->m_placements.append(placement);
     // TODO onProperty
 }
 
-void oa::Parser::onText(QIODevice& dataStream)
+void oa::Parser::onText(QIODevice &dataStream)
 {
     qInfo("onText");
     Text text;
@@ -787,7 +780,7 @@ void oa::Parser::onText(QIODevice& dataStream)
     m_currentCell->m_texts.append(text);
 }
 
-void oa::Parser::onRectangle(QIODevice& dataStream)
+void oa::Parser::onRectangle(QIODevice &dataStream)
 {
     qInfo("onRectangle");
     // Rectangle rectangle;
@@ -851,11 +844,13 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
     mesh.m_layer = m_layer;
     mesh.m_oasisType = (qint16)RECTANGLE;
     mesh.m_drawType = (qint16)GL_TRIANGLES;
+    mesh.m_x = m_geometryX;
+    mesh.m_y = m_geometryY;
     mesh.m_baseVertex = m_layout.m_vertexes.size();
-    m_layout.m_vertexes.append(DeltaValue{m_geometryX, m_geometryY});
-    m_layout.m_vertexes.append(DeltaValue{m_geometryX + m_geometryW, m_geometryY});
-    m_layout.m_vertexes.append(DeltaValue{m_geometryX + m_geometryW, m_geometryY + m_geometryH});
-    m_layout.m_vertexes.append(DeltaValue{m_geometryX, m_geometryY + m_geometryH});
+    m_layout.m_vertexes.append(DeltaValue {0, 0});
+    m_layout.m_vertexes.append(DeltaValue {m_geometryW, 0});
+    m_layout.m_vertexes.append(DeltaValue {m_geometryW, m_geometryH});
+    m_layout.m_vertexes.append(DeltaValue {0, m_geometryH});
     mesh.m_vertexCount = 4;
 
     if ((info >> 2) & 1) { // R
@@ -867,7 +862,7 @@ void oa::Parser::onRectangle(QIODevice& dataStream)
     // m_currentCell->m_rectangles.append(rectangle);
 }
 
-void oa::Parser::onPolygon(QIODevice& dataStream)
+void oa::Parser::onPolygon(QIODevice &dataStream)
 {
     qInfo("onPolygon");
 //     Polygon polygon;
@@ -939,7 +934,7 @@ void oa::Parser::onPolygon(QIODevice& dataStream)
 }
 
 
-void oa::Parser::onPath(QIODevice& dataStream)
+void oa::Parser::onPath(QIODevice &dataStream)
 {
     qInfo("onPath");
     quint8 info = 0;
@@ -1032,7 +1027,7 @@ void oa::Parser::onPath(QIODevice& dataStream)
         mesh.m_repetitionCount = m_repetitionCount;
     }
     m_currentCell->m_meshes.append(mesh);
-    
+
 //     Path path;
 //     path.m_layer = m_layer;
 //     path.m_datatype = m_datatype;
@@ -1050,7 +1045,7 @@ void oa::Parser::onPath(QIODevice& dataStream)
 }
 
 // FIXME
-void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
+void oa::Parser::onTrapezoid(QIODevice &dataStream, int type)
 {
 //     Trapezoid trapezoid;
     quint8 info = 0;
@@ -1134,7 +1129,7 @@ void oa::Parser::onTrapezoid(QIODevice& dataStream, int type)
 }
 
 // FIXME
-void oa::Parser::onCTrapezoid(QIODevice& dataStream)
+void oa::Parser::onCTrapezoid(QIODevice &dataStream)
 {
 //     CTrapezoid ctrapezoid;
     quint8 info = 0;
@@ -1222,7 +1217,7 @@ void oa::Parser::onCTrapezoid(QIODevice& dataStream)
 }
 
 // FIXME
-void oa::Parser::onCircle(QIODevice& dataStream)
+void oa::Parser::onCircle(QIODevice &dataStream)
 {
 //     Circle circle;
     quint8 info = 0;
@@ -1279,7 +1274,7 @@ void oa::Parser::onCircle(QIODevice& dataStream)
 
 // TODO How to associate properties to elements
 // If no m_currentCell set, then this property applies to the whole layout
-void oa::Parser::onProperty(QIODevice& dataStream, int type)
+void oa::Parser::onProperty(QIODevice &dataStream, int type)
 {
     qInfo("onProperty");
     if (type == 29) {
@@ -1382,7 +1377,7 @@ void oa::Parser::onProperty(QIODevice& dataStream, int type)
     }
 }
 
-void oa::Parser::onXName(QIODevice& dataStream, int type)
+void oa::Parser::onXName(QIODevice &dataStream, int type)
 {
     qInfo("onXName");
     if (m_xNameMode == Default) {
@@ -1415,7 +1410,7 @@ void oa::Parser::onXName(QIODevice& dataStream, int type)
     */
 }
 
-void oa::Parser::onXElement(QIODevice& dataStream)
+void oa::Parser::onXElement(QIODevice &dataStream)
 {
     qInfo("onXElement");
     // Assert state Element
@@ -1430,7 +1425,7 @@ void oa::Parser::onXElement(QIODevice& dataStream)
 }
 
 // FIXME one ut case
-void oa::Parser::onXGeometry(QIODevice& dataStream)
+void oa::Parser::onXGeometry(QIODevice &dataStream)
 {
     qInfo("onXGeometry");
 //     XGeometry xgeometry;
@@ -1486,7 +1481,7 @@ void oa::Parser::onXGeometry(QIODevice& dataStream)
 //     m_currentCell->m_xgeometries.append(xgeometry);
 }
 
-void oa::Parser::onCBlock(QIODevice& dataStream)
+void oa::Parser::onCBlock(QIODevice &dataStream)
 {
     qInfo("onCBlock");
     quint64 comType = onUnsigned(dataStream);
@@ -1525,7 +1520,7 @@ void oa::Parser::onCBlock(QIODevice& dataStream)
 //     }
 }
 
-quint64 oa::Parser::onUnsigned(QIODevice& dataStream)
+quint64 oa::Parser::onUnsigned(QIODevice &dataStream)
 {
     quint64 v = 0;
     quint64 p = 1;
@@ -1548,7 +1543,7 @@ quint64 oa::Parser::onUnsigned(QIODevice& dataStream)
     return v;
 }
 
-qint64 oa::Parser::onSigned(QIODevice& dataStream)
+qint64 oa::Parser::onSigned(QIODevice &dataStream)
 {
     quint64 us = onUnsigned(dataStream);
     if (us & 1) {
@@ -1557,7 +1552,7 @@ qint64 oa::Parser::onSigned(QIODevice& dataStream)
     return static_cast<qint64>(us >> 1);
 }
 
-double oa::Parser::onReal(QIODevice& dataStream)
+double oa::Parser::onReal(QIODevice &dataStream)
 {
     quint64 k = onUnsigned(dataStream);
     switch (k) {
@@ -1596,18 +1591,18 @@ double oa::Parser::onReal(QIODevice& dataStream)
 }
 
 
-oa::Delta23 oa::Parser::onDelta2(QIODevice& dataStream)
+oa::Delta23 oa::Parser::onDelta2(QIODevice &dataStream)
 {
     return Delta23(onUnsigned(dataStream), true);
 }
 
-oa::Delta23 oa::Parser::onDelta3(QIODevice& dataStream)
+oa::Delta23 oa::Parser::onDelta3(QIODevice &dataStream)
 {
     return Delta23(onUnsigned(dataStream), false);
 }
 
 
-oa::DeltaG oa::Parser::onDeltaG(QIODevice& dataStream)
+oa::DeltaG oa::Parser::onDeltaG(QIODevice &dataStream)
 {
     quint64 v = onUnsigned(dataStream);
     if (v & 1) {
@@ -1618,7 +1613,7 @@ oa::DeltaG oa::Parser::onDeltaG(QIODevice& dataStream)
 }
 
 // t2.6 type validation
-QString oa::Parser::onString(QIODevice& dataStream, StringType type)
+QString oa::Parser::onString(QIODevice &dataStream, StringType type)
 {
     quint32 len = onUnsigned(dataStream);
     if (len > 1024) {
@@ -1651,7 +1646,7 @@ QString oa::Parser::onString(QIODevice& dataStream, StringType type)
     return string;
 }
 
-void oa::Parser::onRepetition(QIODevice& dataStream)
+void oa::Parser::onRepetition(QIODevice &dataStream)
 {
     quint8 type = onUnsigned(dataStream);
     if (type && type < 12) {
@@ -1670,6 +1665,7 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
         int dy = onUnsigned(dataStream);
         int sx = onUnsigned(dataStream);
         int sy = onUnsigned(dataStream);
+        qDebug() << sx << sy;
         m_repetitionOffset = m_layout.m_repetitions.size();
         m_modalVariableSetStatus.m_d.repetition = 1;
         m_repetitionCount = (dx + 2) * (dy + 2);
@@ -1716,6 +1712,7 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
         for (quint64 i = 0; i < dx + 1; ++i) {
             s += onUnsigned(dataStream);
             m_layout.m_repetitions.append(oa::DeltaValue(s, 0));
+            qDebug() << s;
         }
         break;
     }
@@ -1830,17 +1827,18 @@ void oa::Parser::onRepetition(QIODevice& dataStream)
     }
 }
 
-void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
+void oa::Parser::onPointList(QIODevice &dataStream,  bool isPolygon)
 {
     quint8 type = onUnsigned(dataStream);
     quint64 count = onUnsigned(dataStream);
 
     PointList pl;
+    DeltaValue v = {0, 0};
+    pl << v;
     switch (type) {
     case 0:
     case 1: {
         bool h = type == 0;
-        DeltaValue v = {0, 0};
         for (quint64 i = 0; i < count; ++i) {
             // 1-delta
             qint64 d = onSigned(dataStream);
@@ -1865,7 +1863,6 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         break;
     }
     case 2: {
-        DeltaValue v = {0, 0};
         for (quint64 i = 0; i < count; ++i) {
             v += onDelta2(dataStream).value;
             pl << v;
@@ -1873,7 +1870,6 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         break;
     }
     case 3: {
-        DeltaValue v = {0, 0};
         for (quint64 i = 0; i < count; ++i) {
             v += onDelta3(dataStream).value;
             pl << v;
@@ -1881,7 +1877,6 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         break;
     }
     case 4: {
-        DeltaValue v = {0, 0};
         for (quint64 i = 0; i < count; ++i) {
             v += onDeltaG(dataStream).value;
             pl << v;
@@ -1889,7 +1884,6 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         break;
     }
     case 5: {
-        DeltaValue v = {0, 0};
         DeltaValue d = {0, 0};
         for (quint64 i = 0; i < count; ++i) {
             d += onDeltaG(dataStream).value;
@@ -1902,10 +1896,9 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
         throw std::domain_error("invalid PointList");
         break;
     }
-	if (pl.isEmpty())
-	{
+    if (pl.isEmpty()) {
         throw std::domain_error("invalid PointList");
-	}
+    }
     if (isPolygon) {
         m_polygonPointListOffset = m_layout.m_vertexes.size();
         m_polygonPointListCount = pl.size();
@@ -1919,7 +1912,7 @@ void oa::Parser::onPointList(QIODevice& dataStream,  bool isPolygon)
     }
 }
 
-oa::IntervalType oa::Parser::onInterval(QIODevice& dataStream)
+oa::IntervalType oa::Parser::onInterval(QIODevice &dataStream)
 {
     quint8 type = onUnsigned(dataStream);
     switch (type) {
@@ -1945,7 +1938,7 @@ oa::IntervalType oa::Parser::onInterval(QIODevice& dataStream)
 void oa::Parser::undefineModalVariables()
 {
     // placement-x, placement-y, geometry-x, geometry-y, text-x, and text-y
-    
+
     m_placementX = 0;
     m_placementY = 0;
     m_geometryX = 0;
@@ -1958,8 +1951,8 @@ void oa::Parser::undefineModalVariables()
 //     m_polygonPointList.clear();
 //     m_pointList.clear();
     m_lastValuesList.clear();
-	m_layout.m_repetitions.clear();
-	m_layout.m_repetitions.push_back({0,0});
+    m_layout.m_repetitions.clear();
+    m_layout.m_repetitions.push_back({0, 0});
     m_repetitionOffset = 0;
     m_repetitionCount = 1;
     m_polygonPointListOffset = -1;

@@ -118,19 +118,22 @@ void oa::Layout::initializeRender()
     // Setup Shader
     QOpenGLShader *vshader1 = new QOpenGLShader(QOpenGLShader::Vertex, &m_program);
     const char *vsrc1 =
-		"#version 120\n"
-        "attribute highp ivec2 vposition;\n"
-        "attribute highp ivec2 voffset;\n"
+        "#version 120\n"
+        "attribute highp vec2 vposition;\n"
+        "attribute highp vec2 voffset;\n"
+        "attribute highp vec2 vorigin;\n"
+        "uniform mat3 vmap;\n"
         "varying mediump vec4 fcolor;\n"
         "void main(void) {\n"
-        "   gl_Position = vec4((vposition + voffset) - 1000, 1, 4000);\n"
-        "   fcolor = vec4((vposition / 100)*0.1, 0, 1);\n"
+        "   vec2 v = vposition + voffset + vorigin;\n"
+        "   gl_Position = vec4(vmap * vec3(v, 1) - vec3(800, 800, 0), 2500);\n"
+        "   fcolor = vec4((vposition + voffset)*0.007, 0, .5);\n"
         "}\n";
     vshader1->compileSourceCode(vsrc1);
 
     QOpenGLShader *fshader1 = new QOpenGLShader(QOpenGLShader::Fragment, &m_program);
     const char *fsrc1 =
-		"#version 120\n"
+        "#version 120\n"
         "varying mediump vec4 fcolor;\n"
         "void main(void) {\n"
         "   gl_FragColor = fcolor;\n"
@@ -143,10 +146,10 @@ void oa::Layout::initializeRender()
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	bindData();
+    bindData();
 }
 
-void oa::Layout::render()
+void oa::Layout::render(const QTransform& map)
 {
     //@{
     // prepare
@@ -155,9 +158,9 @@ void oa::Layout::render()
     //glClearColor(0.5f, 0.4f, 0.7f, .1f);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glDisable(GL_CULL_FACE);
-    //glFrontFace(GL_CW);
-    //glCullFace(GL_FRONT);
+//     glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CW);
+    glCullFace(GL_FRONT_AND_BACK);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -166,22 +169,22 @@ void oa::Layout::render()
     for (auto &c : m_cells) {
         Cell *cell = c.m_cell;
         for (auto &mesh : cell->m_meshes) {
-            render(mesh);
-			//goto Exit;
+            render(mesh, map);
+            //goto Exit;
         }
         for (auto &p : cell->m_placements) {
-            render(p);
+            render(p, map);
         }
     }
     //@}
-	Exit:
+Exit:
     m_program.release();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
 }
 
-void oa::Layout::render(const Placement &placement)
+void oa::Layout::render(const Placement &placement, const QTransform &map)
 {
     auto it = m_cellNameToReference.find(placement.m_cellName);
     if (it == m_cellNameToReference.end()) {
@@ -194,96 +197,107 @@ void oa::Layout::render(const Placement &placement)
         return;
     }
     Cell *cell = it2.value().m_cell;
-    for (auto &matrix : placement.m_matrixes) {
+    for (auto i = 0; i < placement.m_repetitionCount; ++i) {
+        QTransform t(placement.m_x00, placement.m_x01, 0, placement.m_x10, placement.m_x11, 0,
+                     placement.m_x20 + m_repetitions[placement.m_repetitionOffset + i].m_x,
+                     placement.m_x21 + m_repetitions[placement.m_repetitionOffset + i].m_y, 1.0);
+        t = map * t;
         for (auto &mesh : cell->m_meshes) {
-            render(mesh);
-			return;
+            render(mesh, t);
         }
         for (auto &p : cell->m_placements) {
-            render(p);
+            render(p, t);
         }
     }
 }
 
-bool oa::Layout::reportGlError(const QString &tag) {
+bool oa::Layout::reportGlError(const QString &tag)
+{
     GLenum error = GL_NO_ERROR;
     error = glGetError();
     if (error != GL_NO_ERROR) {
         qDebug() << tag << error;
-		return true;
+        return true;
     }
-	return false;
+    return false;
 }
-void oa::Layout::render(const Mesh &mesh)
+void oa::Layout::render(const Mesh &mesh, const QTransform &transform)
 {
     if (mesh.m_repetitionOffset == -1) {
-		qDebug() << "REP" <<  mesh.m_vertexCount;
+        qDebug() << "REP" <<  mesh.m_vertexCount;
         return;
     }
-	m_vao.bind();
-	QVector<GLuint> indexData;
-	int slice = mesh.m_vertexCount / 4;
-	if (mesh.m_vertexCount % 4)
-	{
-		qDebug() << mesh.m_vertexCount;
-	}
-	for (int i = 0; i < slice ; ++i)
-	{
-		indexData.append(i*4);
-		indexData.append(i*4+1);
-		indexData.append(i*4+2);
-		indexData.append(i*4);
-		indexData.append(i*4+2);
-		indexData.append(i*4+3);
-	}
+    m_vao.release();
+    int map = m_program.uniformLocation("vmap");
+//   glVertexAttrib2f(map, mesh.m_x, mesh.m_y);
+    GLfloat mapData[9] = {0};
+    mapData[0] = transform.m11();
+    mapData[1] = transform.m12();
+    mapData[2] = transform.m13();
+    mapData[3] = transform.m21();
+    mapData[4] = transform.m22();
+    mapData[5] = transform.m23();
+    mapData[6] = transform.m31();
+    mapData[7] = transform.m32();
+    mapData[8] = transform.m33();
+    glUniformMatrix3fv(map, 1, GL_FALSE, mapData);
+
+    m_vao.bind();
+
+    QVector<GLuint> indexData;
+    for (int i = 0; i < mesh.m_vertexCount; ++i) {
+        indexData.append(mesh.m_baseVertex + i);
+    }
 
     m_ibo->create();
     m_ibo->bind();
     m_ibo->allocate(indexData.constData(), indexData.size() * sizeof(GLuint));
-
+    int offsetAttr = m_program.attributeLocation("voffset");
     m_tbo->create();
-    if (mesh.m_repetitionOffset > -1) {
-        m_tbo->bind();
-        m_tbo->allocate(m_repetitions.constData() + mesh.m_repetitionOffset, mesh.m_repetitionCount * sizeof(oa::DeltaValue));
-		int offsetAttr = m_program.attributeLocation("vposition");
-        m_program.enableAttributeArray(offsetAttr);
+    m_tbo->bind();
+    m_tbo->allocate(m_repetitions.constData() + mesh.m_repetitionOffset, mesh.m_repetitionCount * sizeof(oa::DeltaValue));
+    m_program.enableAttributeArray(offsetAttr);
+    glVertexAttribPointer(offsetAttr, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    reportGlError("V5");
+    glVertexAttribDivisor(offsetAttr, 1);
 
-		glVertexAttribPointer(offsetAttr, 2, GL_INT, GL_FALSE, 0, nullptr);
-		reportGlError("V5");
-        //glVertexAttribDivisor(1, 1);
-    }
-    
+    int origin = m_program.attributeLocation("vorigin");
+
+    glVertexAttrib2f(origin, mesh.m_x, mesh.m_y);
+
     //Draw
-	glDrawElementsInstancedBaseVertex(GL_TRIANGLES, mesh.m_vertexCount * 2 , GL_UNSIGNED_INT, nullptr, mesh.m_repetitionCount, mesh.m_baseVertex);
-	reportGlError("V7");
-	m_vao.release();
-
-    //m_vbo->release();
+    qDebug() << "X" << transform;
+    m_vao.bind();
+    glDrawElementsInstanced(GL_TRIANGLE_FAN, mesh.m_vertexCount * 2 , GL_UNSIGNED_INT, 0, mesh.m_repetitionCount);
+//  glDrawElementsInstanced(GL_LINE_LOOP, mesh.m_vertexCount * 2 , GL_UNSIGNED_INT, 0, mesh.m_repetitionCount);
+  glDrawElementsInstanced(GL_TRIANGLES, mesh.m_vertexCount * 2 , GL_UNSIGNED_INT, 0, mesh.m_repetitionCount);
+    reportGlError("V7");
+    m_vao.release();
     m_ibo->release();
     m_tbo->release();
-   // m_program.disableAttributeArray(0);
-    m_program.disableAttributeArray(1);
-   // m_program.disableAttributeArray(2);
+    // m_program.disableAttributeArray(0);
+//     m_program.disableAttributeArray(offsetAttr);
+    // m_program.disableAttributeArray(2);
 }
 
 
 void oa::Layout::bindData()
 {
     m_vao.create();
-	reportGlError("V1");
+    reportGlError("V1");
     m_vao.bind();
     m_vbo->create();
-	reportGlError("V2");
+    reportGlError("V2");
     m_vbo->bind();
     m_vbo->allocate(m_vertexes.constData(), m_vertexes.size() * sizeof(oa::DeltaValue));
-	reportGlError("V3");
+    reportGlError("V3");
 
-	int positionAttr = m_program.attributeLocation("vposition");
-	
+    int positionAttr = m_program.attributeLocation("vposition");
+
     m_program.enableAttributeArray(positionAttr);
-	glVertexAttribPointer(positionAttr, 2, GL_INT, GL_FALSE, 0, nullptr); 
-	reportGlError("V4");
-	m_vao.release();
+    glVertexAttribPointer(positionAttr, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    reportGlError("V4");
+    m_vao.release();
 }
 
 

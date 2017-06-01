@@ -81,6 +81,10 @@ public:
 public slots:
     void renderNext()
     {
+        if (m_renderFbo)
+        {
+            return;
+        }
         context->makeCurrent(surface);
 
         if (!m_renderFbo) {
@@ -92,9 +96,10 @@ public slots:
             m_layout = new oa::Layout(); // PolygonRenderer();
             oa::Parser parser(*m_layout);
             const QString oasisDataDir ="/home/yanlb/projects/klayout-r2864/testdata/oasis/";
-            parser.open(oasisDataDir + "t4.2.oas");
+            parser.open(oasisDataDir + "t8.2.oas");
             m_layout->initializeRender();
         }
+        
 
         m_renderFbo->bind();
         context->functions()->glViewport(0, 0, m_size.width(), m_size.height());
@@ -227,7 +232,7 @@ ThreadRenderer::ThreadRenderer()
     : m_renderThread(0)
 {
     setFlag(ItemHasContents, true);
-    m_renderThread = new RenderThread(QSize(512, 512));
+    m_renderThread = new RenderThread(QSize(2048, 2048));
 }
 
 void ThreadRenderer::ready()
