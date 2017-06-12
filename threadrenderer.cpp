@@ -97,13 +97,20 @@ public slots:
             oa::Parser parser(*m_layout);
             const QString oasisDataDir ="/home/yanlb/projects/klayout-r2864/testdata/oasis/";
             parser.open(oasisDataDir + "t8.2.oas");
-            m_layout->initializeRender();
-        }
-        
+//             parser.open("/home/yanlb/projects/gds/M4.OAS");
+//             parser.open("/home/yanlb/projects/gds/Ferrari_crop_with_all_layers_400.OAS");
 
+			m_layout->prepareMeshes();
+			m_layout->initializeRender();
+       }
         m_renderFbo->bind();
         context->functions()->glViewport(0, 0, m_size.width(), m_size.height());
-
+//     GLenum error = GL_NO_ERROR;
+//     error = glGetError();
+//     if (error != GL_NO_ERROR) {
+//         qDebug() << "glViewport" << error;
+//         return ;
+//     }
         m_layout->render();
 
         // We need to flush the contents to the FBO before posting
@@ -206,7 +213,9 @@ public slots:
             delete m_texture;
             // note: include QQuickWindow::TextureHasAlphaChannel if the rendered content
             // has alpha.
-            m_texture = m_window->createTextureFromId(newId, size);
+             m_texture = m_window->createTextureFromId(newId, size);
+//             m_texture = m_window->createTextureFromId(newId, size,
+//                                                       QQuickWindow::CreateTextureOption(QQuickWindow::TextureHasAlphaChannel/* | QQuickWindow::TextureHasMipmaps*/));
             setTexture(m_texture);
 
             markDirty(DirtyMaterial);
@@ -232,7 +241,7 @@ ThreadRenderer::ThreadRenderer()
     : m_renderThread(0)
 {
     setFlag(ItemHasContents, true);
-    m_renderThread = new RenderThread(QSize(2048, 2048));
+    m_renderThread = new RenderThread(QSize(16384, 16384));
 }
 
 void ThreadRenderer::ready()

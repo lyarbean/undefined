@@ -16,6 +16,14 @@ namespace oa {
 // TODO need to generate images for texts with the help QTextLayout??\
 // TODO convert Circle to Polygon
 
+struct Transform {
+    float m_x00, m_x01, m_x10, m_x11, m_x20, m_x21;
+};
+
+struct TransformInfo {
+    float a, b, c, d, e, f, g, h, i; // matrix
+};
+
 struct Mesh {
     quint32 m_layer = 0;
     quint32 m_datatype = 0;
@@ -30,6 +38,9 @@ struct Mesh {
     qint32 m_materialIndex = -1;
     float m_x = 0;
     float m_y = 0;
+    // key is the cell
+    QMap<qint32, QVector<QTransform>> m_transforms;
+    QVector<TransformInfo> m_transformInfos;
 };
 struct Text {
     QString m_string;
@@ -92,12 +103,15 @@ public:
     Layout() : m_unit(1) {
         m_vbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
         m_tbo = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+
         m_ibo = new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
     }
     void initializeRender();
     void render(const QTransform& map = QTransform()); // TODO pass World matrix
-    void render(const Placement& placement, const QTransform& map = QTransform());
+//     void render(const Placement& placement, const QTransform& map = QTransform());
     void render(const Mesh& mesh, const QTransform& map = QTransform());
+    void prepareMeshes();
+    void applyPlacement(const Placement& placement, quint32 cellId, const QTransform& transform = QTransform());
 	void bindData();
 	bool reportGlError(const QString &tag);
 //     void put();
